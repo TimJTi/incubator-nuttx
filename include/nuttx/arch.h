@@ -78,13 +78,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <sched.h>
 
 #include <arch/arch.h>
 #include <arch/types.h>
 
 #include <nuttx/compiler.h>
 #include <nuttx/cache.h>
-#include <nuttx/sched.h>
 
 /****************************************************************************
  * Pre-processor definitions
@@ -96,7 +96,6 @@
 
 typedef CODE void (*sig_deliver_t)(FAR struct tcb_s *tcb);
 typedef CODE void (*phy_enable_t)(bool enable);
-typedef CODE void (*initializer_t)(void);
 
 /****************************************************************************
  * Public Data
@@ -148,15 +147,6 @@ EXTERN volatile bool g_rtc_enabled;
 
 /* EXTERN const irq_mapped_t g_irqmap[NR_IRQS]; */
 
-#endif
-
-#ifdef CONFIG_HAVE_CXXINITIALIZE
-/* _sinit and _einit are symbols exported by the linker script that mark the
- * beginning and the end of the C++ initialization section.
- */
-
-extern initializer_t _sinit[];
-extern initializer_t _einit[];
 #endif
 
 /****************************************************************************
@@ -242,8 +232,8 @@ void up_initial_state(FAR struct tcb_s *tcb);
  *   - adj_stack_size: Stack size after adjustment for hardware, processor,
  *     etc.  This value is retained only for debug purposes.
  *   - stack_alloc_ptr: Pointer to allocated stack
- *   - stack_base_ptr: Adjusted stack base pointer after the TLS Data and
- *     Arguments has been removed from the stack allocation.
+ *   - adj_stack_ptr: Adjusted stack_alloc_ptr for HW.  The initial value of
+ *     the stack pointer.
  *
  * Input Parameters:
  *   - tcb: The TCB of new task
@@ -284,8 +274,8 @@ int up_create_stack(FAR struct tcb_s *tcb, size_t stack_size, uint8_t ttype);
  *     processor, etc.  This value is retained only for debug
  *     purposes.
  *   - stack_alloc_ptr: Pointer to allocated stack
- *   - stack_base_ptr: Adjusted stack base pointer after the TLS Data and
- *     Arguments has been removed from the stack allocation.
+ *   - adj_stack_ptr: Adjusted stack_alloc_ptr for HW.  The
+ *     initial value of the stack pointer.
  *
  * Input Parameters:
  *   - tcb:  The TCB of new task
@@ -318,24 +308,9 @@ int up_use_stack(FAR struct tcb_s *tcb, FAR void *stack, size_t stack_size);
  *
  *   - adj_stack_size: Stack size after removal of the stack frame from
  *     the stack
- *   - stack_base_ptr: Adjusted stack base pointer after the TLS Data and
- *     Arguments has been removed from the stack allocation.
- *
- *   Here is the diagram after some allocation(tls, arg):
- *
- *                   +-------------+ <-stack_alloc_ptr(lowest)
- *                   |  TLS Data   |
- *                   +-------------+
- *                   |  Arguments  |
- *  stack_base_ptr-> +-------------+\
- *                   |  Available  | +
- *                   |    Stack    | |
- *                |  |             | |
- *                |  |             | +->adj_stack_size
- *                v  |             | |
- *                   |             | |
- *                   |             | +
- *                   +-------------+/
+ *   - adj_stack_ptr: Adjusted initial stack pointer after the frame has
+ *     been removed from the stack.  This will still be the initial value
+ *     of the stack pointer when the task is started.
  *
  * Input Parameters:
  *   - tcb:  The TCB of new task
@@ -384,24 +359,50 @@ FAR void *up_stack_frame(FAR struct tcb_s *tcb, size_t frame_size);
 void up_release_stack(FAR struct tcb_s *dtcb, uint8_t ttype);
 
 /****************************************************************************
- * Name: up_switch_context
+ * Name: up_unblock_task
  *
  * Description:
- *   A task is currently in the ready-to-run list but has been prepped
- *   to execute. Restore its context, and start execution.
+ *   A task is currently in an inactive task list
+ *   but has been prepped to execute.  Move the TCB to the
+ *   ready-to-run list, restore its context, and start execution.
  *
  *   This function is called only from the NuttX scheduling
  *   logic.  Interrupts will always be disabled when this
  *   function is called.
  *
  * Input Parameters:
- *   tcb: Refers to the head task of the ready-to-run list
- *     which will be executed.
- *   rtcb: Refers to the running task which will be blocked.
+ *   tcb: Refers to the tcb to be unblocked.  This tcb is
+ *     in one of the waiting tasks lists.  It must be moved to
+ *     the ready-to-run list and, if it is the highest priority
+ *     ready to run task, executed.
  *
  ****************************************************************************/
 
-void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb);
+void up_unblock_task(FAR struct tcb_s *tcb);
+
+/****************************************************************************
+ * Name: up_block_task
+ *
+ * Description:
+ *   The currently executing task at the head of the ready to run list must
+ *   be stopped.  Save its context and move it to the inactive list
+ *   specified by task_state.
+ *
+ *   This function is called only from the NuttX scheduling logic.
+ *   Interrupts will always be disabled when this function is called.
+ *
+ * Input Parameters:
+ *   tcb: Refers to a task in the ready-to-run list (normally the task at
+ *     the head of the list).  It must be stopped, its context saved and
+ *     moved into one of the waiting task lists.  If it was the task at the
+ *     head of the ready-to-run list, then a context switch to the new ready
+ *     to run task must be performed.
+ *   task_state: Specifies which waiting task list should be
+ *     hold the blocked task TCB.
+ *
+ ****************************************************************************/
+
+void up_block_task(FAR struct tcb_s *tcb, tstate_t task_state);
 
 /****************************************************************************
  * Name: up_release_pending
@@ -423,6 +424,32 @@ void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb);
 void up_release_pending(void);
 
 /****************************************************************************
+ * Name: up_reprioritize_rtr
+ *
+ * Description:
+ *   Called when the priority of a running or
+ *   ready-to-run task changes and the reprioritization will
+ *   cause a context switch.  Two cases:
+ *
+ *   1) The priority of the currently running task drops and the next
+ *      task in the ready to run list has priority.
+ *   2) An idle, ready to run task's priority has been raised above the
+ *      the priority of the current, running task and it now has the
+ *      priority.
+ *
+ *   This function is called only from the NuttX scheduling
+ *   logic.  Interrupts will always be disabled when this
+ *   function is called.
+ *
+ * Input Parameters:
+ *   tcb: The TCB of the task that has been reprioritized
+ *   priority: The new task priority
+ *
+ ****************************************************************************/
+
+void up_reprioritize_rtr(FAR struct tcb_s *tcb, uint8_t priority);
+
+/****************************************************************************
  * Name: up_exit
  *
  * Description:
@@ -437,7 +464,7 @@ void up_release_pending(void);
  *
  ****************************************************************************/
 
-void up_exit(int status) noreturn_function;
+void up_exit() noreturn_function;
 
 /* Prototype is in unistd.h */
 
@@ -450,37 +477,6 @@ void up_exit(int status) noreturn_function;
  ****************************************************************************/
 
 void up_assert(FAR const char *filename, int linenum);
-
-#ifdef CONFIG_ARCH_HAVE_BACKTRACE
-
-/****************************************************************************
- * Name: up_backtrace
- *
- * Description:
- *  up_backtrace()  returns  a backtrace for the TCB, in the array
- *  pointed to by buffer.  A backtrace is the series of currently active
- *  function calls for the program.  Each item in the array pointed to by
- *  buffer is of type void *, and is the return address from the
- *  corresponding stack frame.  The size argument specifies the maximum
- *  number of addresses that can be stored in buffer.   If  the backtrace is
- *  larger than size, then the addresses corresponding to the size most
- *  recent function calls are returned; to obtain the complete backtrace,
- *  make sure that buffer and size are large enough.
- *
- * Input Parameters:
- *   tcb    - Address of the task's TCB, NULL means dump the running task
- *   buffer - Return address from the corresponding stack frame
- *   size   - Maximum number of addresses that can be stored in buffer
- *   skip   - number of addresses to be skipped
- *
- * Returned Value:
- *   up_backtrace() returns the number of addresses returned in buffer
- *
- ****************************************************************************/
-
-int up_backtrace(FAR struct tcb_s *tcb,
-                 FAR void **buffer, int size, int skip);
-#endif /* CONFIG_ARCH_HAVE_BACKTRACE */
 
 /****************************************************************************
  * Name: up_schedule_sigaction
@@ -558,10 +554,9 @@ void up_task_start(main_t taskentry, int argc, FAR char *argv[])
  *   pthread by calling this function.
  *
  *   Normally the a user-mode start-up stub will also execute before the
- *   pthread actually starts.  See libc/pthread/pthread_create.c
+ *   pthread actually starts.  See libc/pthread/pthread_startup.c
  *
  * Input Parameters:
- *   startup - The user-space pthread startup function
  *   entrypt - The user-space address of the pthread entry point
  *   arg     - Standard argument for the pthread entry point
  *
@@ -574,8 +569,7 @@ void up_task_start(main_t taskentry, int argc, FAR char *argv[])
 
 #if !defined(CONFIG_BUILD_FLAT) && defined(__KERNEL__) && \
     !defined(CONFIG_DISABLE_PTHREAD)
-void up_pthread_start(pthread_trampoline_t startup,
-                      pthread_startroutine_t entrypt, pthread_addr_t arg)
+void up_pthread_start(pthread_startroutine_t entrypt, pthread_addr_t arg)
        noreturn_function;
 #endif
 
@@ -724,51 +718,39 @@ uintptr_t pgalloc(uintptr_t brkaddr, unsigned int npages);
 #endif
 
 /****************************************************************************
- * Name: up_extraheaps_init
+ * Name: up_module_text_init
  *
  * Description:
- *   Initialize any extra heap.
+ *   Initialize the module text allocator
  *
  ****************************************************************************/
 
-#if defined(CONFIG_ARCH_HAVE_EXTRA_HEAPS)
-void up_extraheaps_init(void);
+#if defined(CONFIG_ARCH_USE_MODULE_TEXT)
+void up_module_text_init(void);
 #endif
 
 /****************************************************************************
- * Name: up_textheap_memalign
+ * Name: up_module_text_alloc
  *
  * Description:
- *   Allocate memory for text sections with the specified alignment.
+ *   Allocate memory for module text.
  *
  ****************************************************************************/
 
-#if defined(CONFIG_ARCH_USE_TEXT_HEAP)
-FAR void *up_textheap_memalign(size_t align, size_t size);
+#if defined(CONFIG_ARCH_USE_MODULE_TEXT)
+FAR void *up_module_text_alloc(size_t size);
 #endif
 
 /****************************************************************************
- * Name: up_textheap_free
+ * Name: up_module_text_free
  *
  * Description:
- *   Free memory allocated for text sections.
+ *   Free memory for module text.
  *
  ****************************************************************************/
 
-#if defined(CONFIG_ARCH_USE_TEXT_HEAP)
-void up_textheap_free(FAR void *p);
-#endif
-
-/****************************************************************************
- * Name: up_textheap_heapmember
- *
- * Description:
- *   Test if memory is from text heap.
- *
- ****************************************************************************/
-
-#if defined(CONFIG_ARCH_USE_TEXT_HEAP)
-bool up_textheap_heapmember(FAR void *p);
+#if defined(CONFIG_ARCH_USE_MODULE_TEXT)
+void up_module_text_free(FAR void *p);
 #endif
 
 /****************************************************************************
@@ -800,8 +782,6 @@ bool up_textheap_heapmember(FAR void *p);
  *   up_addrenv_vtext    - Returns the virtual base address of the .text
  *                         address environment
  *   up_addrenv_vdata    - Returns the virtual base address of the .bss/.data
- *                         address environment
- *   up_addrenv_vheap    - Returns the virtual base address of the heap
  *                         address environment
  *   up_addrenv_heapsize - Returns the size of the initial heap allocation.
  *   up_addrenv_select   - Instantiate an address environment
@@ -962,28 +942,6 @@ int up_addrenv_vtext(FAR group_addrenv_t *addrenv, FAR void **vtext);
 #ifdef CONFIG_ARCH_ADDRENV
 int up_addrenv_vdata(FAR group_addrenv_t *addrenv, uintptr_t textsize,
                      FAR void **vdata);
-#endif
-
-/****************************************************************************
- * Name: up_addrenv_vheap
- *
- * Description:
- *   Return the heap virtual address associated with the newly created
- *   address environment.  This function is used by the binary loaders in
- *   order get an address that can be used to initialize the new task.
- *
- * Input Parameters:
- *   addrenv - The representation of the task address environment previously
- *      returned by up_addrenv_create.
- *   vheap - The location to return the virtual address.
- *
- * Returned Value:
- *   Zero (OK) on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
-#if defined(CONFIG_ARCH_ADDRENV) && defined(CONFIG_BUILD_KERNEL)
-int up_addrenv_vheap(FAR const group_addrenv_t *addrenv, FAR void **vheap);
 #endif
 
 /****************************************************************************
@@ -1153,28 +1111,6 @@ int up_addrenv_attach(FAR struct task_group_s *group, FAR struct tcb_s *tcb);
 
 #ifdef CONFIG_ARCH_ADDRENV
 int up_addrenv_detach(FAR struct task_group_s *group, FAR struct tcb_s *tcb);
-#endif
-
-/****************************************************************************
- * Name: up_addrenv_mprot
- *
- * Description:
- *   Modify access rights to an address range.
- *
- * Input Parameters:
- *   addrenv - The address environment to be modified.
- *   addr - Base address of the region.
- *   len - Size of the region.
- *   prot - Access right flags.
- *
- * Returned Value:
- *   Zero (OK) on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
-#ifdef CONFIG_ARCH_ADDRENV
-int up_addrenv_mprot(FAR group_addrenv_t *addrenv, uintptr_t addr,
-                     size_t len, int prot);
 #endif
 
 /****************************************************************************
@@ -1408,6 +1344,17 @@ int up_shmdt(uintptr_t vaddr, unsigned int npages);
 void up_irqinitialize(void);
 
 /****************************************************************************
+ * Name: up_interrupt_context
+ *
+ * Description:
+ *   Return true is we are currently executing in
+ *   the interrupt handler context.
+ *
+ ****************************************************************************/
+
+bool up_interrupt_context(void);
+
+/****************************************************************************
  * Name: up_enable_irq
  *
  * Description:
@@ -1449,18 +1396,6 @@ void up_disable_irq(int irq);
 #endif
 
 /****************************************************************************
- * Name: up_affinity_irq
- *
- * Description:
- *   Set an IRQ affinity by software.
- *
- ****************************************************************************/
-
-#ifdef CONFIG_SMP
-void up_affinity_irq(int irq, cpu_set_t cpuset);
-#endif
-
-/****************************************************************************
  * Name: up_trigger_irq
  *
  * Description:
@@ -1469,7 +1404,7 @@ void up_affinity_irq(int irq, cpu_set_t cpuset);
  ****************************************************************************/
 
 #ifdef CONFIG_ARCH_HAVE_IRQTRIGGER
-void up_trigger_irq(int irq, cpu_set_t cpuset);
+void up_trigger_irq(int irq);
 #endif
 
 /****************************************************************************
@@ -1485,30 +1420,6 @@ void up_trigger_irq(int irq, cpu_set_t cpuset);
 
 #ifdef CONFIG_ARCH_IRQPRIO
 int up_prioritize_irq(int irq, int priority);
-#endif
-
-#ifdef CONFIG_ARCH_HAVE_TRUSTZONE
-
-/****************************************************************************
- * Name: up_set_secure_irq
- *
- * Description:
- *   Secure an IRQ
- *
- ****************************************************************************/
-
-void up_secure_irq(int irq, bool secure);
-
-/****************************************************************************
- * Name: up_secure_irq_all
- *
- * Description:
- *   Secure all IRQ
- *
- ****************************************************************************/
-
-void up_secure_irq_all(bool secure);
-
 #endif
 
 /****************************************************************************
@@ -1595,16 +1506,13 @@ void up_timer_initialize(void);
  *
  ****************************************************************************/
 
-#if defined(CONFIG_SCHED_TICKLESS) && !defined(CONFIG_SCHED_TICKLESS_TICK_ARGUMENT)
+#if defined(CONFIG_SCHED_TICKLESS) && !defined(CONFIG_CLOCK_TIMEKEEPING)
 int up_timer_gettime(FAR struct timespec *ts);
 #endif
 
-#if defined(CONFIG_SCHED_TICKLESS_TICK_ARGUMENT) || defined(CONFIG_CLOCK_TIMEKEEPING)
-int up_timer_gettick(FAR clock_t *ticks);
-#endif
-
 #ifdef CONFIG_CLOCK_TIMEKEEPING
-void up_timer_getmask(FAR clock_t *mask);
+int up_timer_getcounter(FAR uint64_t *cycles);
+void up_timer_getmask(FAR uint64_t *mask);
 #endif
 
 /****************************************************************************
@@ -1642,11 +1550,7 @@ void up_timer_getmask(FAR clock_t *mask);
  ****************************************************************************/
 
 #if defined(CONFIG_SCHED_TICKLESS) && defined(CONFIG_SCHED_TICKLESS_ALARM)
-#  ifndef CONFIG_SCHED_TICKLESS_TICK_ARGUMENT
 int up_alarm_cancel(FAR struct timespec *ts);
-#  else
-int up_alarm_tick_cancel(FAR clock_t *ticks);
-#  endif
 #endif
 
 /****************************************************************************
@@ -1675,11 +1579,7 @@ int up_alarm_tick_cancel(FAR clock_t *ticks);
  ****************************************************************************/
 
 #if defined(CONFIG_SCHED_TICKLESS) && defined(CONFIG_SCHED_TICKLESS_ALARM)
-#  ifndef CONFIG_SCHED_TICKLESS_TICK_ARGUMENT
 int up_alarm_start(FAR const struct timespec *ts);
-#  else
-int up_alarm_tick_start(clock_t ticks);
-#  endif
 #endif
 
 /****************************************************************************
@@ -1719,11 +1619,7 @@ int up_alarm_tick_start(clock_t ticks);
  ****************************************************************************/
 
 #if defined(CONFIG_SCHED_TICKLESS) && !defined(CONFIG_SCHED_TICKLESS_ALARM)
-#  ifndef CONFIG_SCHED_TICKLESS_TICK_ARGUMENT
 int up_timer_cancel(FAR struct timespec *ts);
-#  else
-int up_timer_tick_cancel(FAR clock_t *ticks);
-#  endif
 #endif
 
 /****************************************************************************
@@ -1752,29 +1648,8 @@ int up_timer_tick_cancel(FAR clock_t *ticks);
  ****************************************************************************/
 
 #if defined(CONFIG_SCHED_TICKLESS) && !defined(CONFIG_SCHED_TICKLESS_ALARM)
-#  ifndef CONFIG_SCHED_TICKLESS_TICK_ARGUMENT
 int up_timer_start(FAR const struct timespec *ts);
-#  else
-int up_timer_tick_start(clock_t ticks);
-#  endif
 #endif
-
-/****************************************************************************
- * Name: up_getsp
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   Current stack pointer.
- *
- ****************************************************************************/
-
-/* uintptr_t up_getsp(void);
- *
- * The actual declaration or definition is provided in arch/arch.h.
- * The actual implementation may be a MACRO or an inline function.
- */
 
 /****************************************************************************
  * TLS support
@@ -1811,42 +1686,9 @@ int up_timer_tick_start(clock_t ticks);
 /* struct tls_info_s;
  * FAR struct tls_info_s *up_tls_info(void);
  *
- * The actual definition is provided in arch/arch.h as a macro. The default
- * implementation provided here assume the arch has a "push down" stack.
+ * The actual declaration or definition is provided in arch/tls.h.  The
+ * actual implementation may be a MACRO or an inline function.
  */
-
-/****************************************************************************
- * Name: up_tls_size
- *
- * Description:
- *   Get TLS (sizeof(struct tls_info_s) + tdata + tbss) section size.
- *
- * Returned Value:
- *   Size of (sizeof(struct tls_info_s) + tdata + tbss).
- *
- ****************************************************************************/
-
-#ifdef CONFIG_SCHED_THREAD_LOCAL
-int up_tls_size(void);
-#endif
-
-/****************************************************************************
- * Name: up_tls_initialize
- *
- * Description:
- *   Initialize thread local region
- *
- * Input Parameters:
- *   tls_data - The memory region to initialize
- *
- ****************************************************************************/
-
-#ifdef CONFIG_SCHED_THREAD_LOCAL
-struct tls_info_s;
-void up_tls_initialize(FAR struct tls_info_s *info);
-#else
-#define up_tls_initialize(x)
-#endif
 
 /****************************************************************************
  * Multiple CPU support
@@ -1921,6 +1763,28 @@ int8_t up_fetchsub8(FAR volatile int8_t *addr, int8_t value);
 #endif
 
 /****************************************************************************
+ * Name: up_cpu_index
+ *
+ * Description:
+ *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
+ *   corresponds to the currently executing CPU.
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
+ *   corresponds to the currently executing CPU.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_SMP
+int up_cpu_index(void);
+#else
+#  define up_cpu_index() (0)
+#endif
+
+/****************************************************************************
  * Name: up_cpu_idlestack
  *
  * Description:
@@ -1950,8 +1814,8 @@ int8_t up_fetchsub8(FAR volatile int8_t *addr, int8_t value);
  *   - adj_stack_size: Stack size after adjustment for hardware, processor,
  *     etc.  This value is retained only for debug purposes.
  *   - stack_alloc_ptr: Pointer to allocated stack
- *   - stack_base_ptr: Adjusted stack base pointer after the TLS Data and
- *     Arguments has been removed from the stack allocation.
+ *   - adj_stack_ptr: Adjusted stack_alloc_ptr for HW.  The initial value of
+ *     the stack pointer.
  *
  * Input Parameters:
  *   - cpu:         CPU index that indicates which CPU the IDLE task is
@@ -1959,7 +1823,7 @@ int8_t up_fetchsub8(FAR volatile int8_t *addr, int8_t value);
  *   - tcb:         The TCB of new CPU IDLE task
  *   - stack_size:  The requested stack size for the IDLE task.  At least
  *                  this much must be allocated.  This should be
- *                  CONFIG_IDLETHREAD_STACKSIZE.
+ *                  CONFIG_SMP_IDLETHREAD_STACKSIZE.
  *
  ****************************************************************************/
 
@@ -1969,14 +1833,14 @@ int up_cpu_idlestack(int cpu, FAR struct tcb_s *tcb, size_t stack_size);
  * Name: up_cpu_start
  *
  * Description:
- *   In an SMP configuration, only one CPU is initially active (CPU 0).
- *   System initialization occurs on that single thread. At the completion of
- *   the initialization of the OS, just before beginning normal multitasking,
+ *   In an SMP configution, only one CPU is initially active (CPU 0). System
+ *   initialization occurs on that single thread. At the completion of the
+ *   initialization of the OS, just before beginning normal multitasking,
  *   the additional CPUs would be started by calling this function.
  *
- *   Each CPU is provided the entry point to its IDLE task when started.  A
+ *   Each CPU is provided the entry point to is IDLE task when started.  A
  *   TCB for each CPU's IDLE task has been initialized and placed in the
- *   CPU's g_assignedtasks[cpu] list.  No stack has been allocated or
+ *   CPU's g_assignedtasks[cpu] list.  A stack has also been allocateded and
  *   initialized.
  *
  *   The OS initialization logic calls this function repeatedly until each
@@ -1984,8 +1848,8 @@ int up_cpu_idlestack(int cpu, FAR struct tcb_s *tcb, size_t stack_size);
  *
  * Input Parameters:
  *   cpu - The index of the CPU being started.  This will be a numeric
- *         value in the range of one to (CONFIG_SMP_NCPUS-1).
- *         (CPU 0 is already active)
+ *         value in the range of from one to (CONFIG_SMP_NCPUS-1).  (CPU
+ *         0 is already active)
  *
  * Returned Value:
  *   Zero on success; a negated errno value on failure.
@@ -2219,11 +2083,10 @@ void nxsched_timer_expiration(void);
 
 #if defined(CONFIG_SCHED_TICKLESS) && defined(CONFIG_SCHED_TICKLESS_ALARM)
 void nxsched_alarm_expiration(FAR const struct timespec *ts);
-void nxsched_alarm_tick_expiration(clock_t ticks);
 #endif
 
 /****************************************************************************
- * Name: nxsched_process_cpuload_ticks
+ * Name: nxsched_process_cpuload
  *
  * Description:
  *   Collect data that can be used for CPU load measurements.  When
@@ -2232,7 +2095,7 @@ void nxsched_alarm_tick_expiration(clock_t ticks);
  *   interface.
  *
  * Input Parameters:
- *   ticks - The ticks that we increment in this cpuload
+ *   None
  *
  * Returned Value:
  *   None
@@ -2244,8 +2107,7 @@ void nxsched_alarm_tick_expiration(clock_t ticks);
  ****************************************************************************/
 
 #if defined(CONFIG_SCHED_CPULOAD) && defined(CONFIG_SCHED_CPULOAD_EXTCLK)
-void nxsched_process_cpuload_ticks(uint32_t ticks);
-#  define nxsched_process_cpuload() nxsched_process_cpuload_ticks(1)
+void weak_function nxsched_process_cpuload(void);
 #endif
 
 /****************************************************************************
@@ -2309,7 +2171,7 @@ size_t  up_check_intstack_remain(void);
  *
  ****************************************************************************/
 
-#if defined(CONFIG_RTC)
+#if defined(CONFIG_RTC) && !defined(CONFIG_RTC_EXTERNAL)
 int up_rtc_initialize(void);
 #endif
 
@@ -2520,8 +2382,7 @@ int up_putc(int ch);
  *
  ****************************************************************************/
 
-#define up_puts(str) up_nputs(str, ~((size_t)0))
-void up_nputs(FAR const char *str, size_t len);
+void up_puts(FAR const char *str);
 
 /****************************************************************************
  * Name: arch_sporadic_*
@@ -2547,7 +2408,7 @@ void arch_sporadic_resume(FAR struct tcb_s *tcb);
 #endif
 
 /****************************************************************************
- * Name: up_perf_*
+ * Name: up_critmon_*
  *
  * Description:
  *   The first interface simply provides the current time value in unknown
@@ -2563,43 +2424,11 @@ void arch_sporadic_resume(FAR struct tcb_s *tcb);
  *
  *   The second interface simple converts an elapsed time into well known
  *   units.
- *
  ****************************************************************************/
 
-void up_perf_init(FAR void *arg);
-uint32_t up_perf_gettime(void);
-uint32_t up_perf_getfreq(void);
-void up_perf_convert(uint32_t elapsed, FAR struct timespec *ts);
-
-/****************************************************************************
- * Name: up_saveusercontext
- *
- * Description:
- *   Save the current thread context
- *
- ****************************************************************************/
-
-int up_saveusercontext(FAR void *saveregs);
-
-/****************************************************************************
- * Name: up_fpucmp
- *
- * Description:
- *   Compare FPU areas from thread context.
- *
- * Input Parameters:
- *   saveregs1 - Pointer to the saved FPU registers.
- *   saveregs2 - Pointer to the saved FPU registers.
- *
- * Returned Value:
- *   True if FPU areas compare equal, False otherwise.
- *
- ****************************************************************************/
-
-#ifdef CONFIG_ARCH_FPU
-bool up_fpucmp(FAR const void *saveregs1, FAR const void *saveregs2);
-#else
-#define up_fpucmp(r1, r2) (true)
+#ifdef CONFIG_SCHED_CRITMONITOR
+uint32_t up_critmon_gettime(void);
+void up_critmon_convert(uint32_t elapsed, FAR struct timespec *ts);
 #endif
 
 #undef EXTERN
