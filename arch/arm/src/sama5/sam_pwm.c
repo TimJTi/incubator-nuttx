@@ -1,20 +1,35 @@
 /****************************************************************************
  * arch/arm/src/sama5/sam_pwm.c
  *
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.  The
- * ASF licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the
- * License.  You may obtain a copy of the License at
+ *   Copyright (C) 2013, 2016 Gregory Nutt. All rights reserved.
+ *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
- * License for the specific language governing permissions and limitations
- * under the License.
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name NuttX nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
 
@@ -38,6 +53,8 @@
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
+#include "arm_arch.h"
+
 #include "sam_periphclks.h"
 #include "sam_pio.h"
 #include "sam_pwm.h"
@@ -47,7 +64,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* Configuration ************************************************************/
 
 #ifndef CONFIG_DEBUG_PWM_INFO
@@ -245,7 +261,6 @@
 /****************************************************************************
  * Private Types
  ****************************************************************************/
-
 /* Channel clock sources */
 
 enum pwm_clksrc_e
@@ -294,24 +309,20 @@ struct sam_pwm_s
 /****************************************************************************
  * Static Function Prototypes
  ****************************************************************************/
-
 /* Register access */
 
 #ifdef CONFIG_SAMA5_PWM_REGDEBUG
-static bool pwm_checkreg(struct sam_pwm_s *chan,
-                         bool wr, uint32_t regval,
+static bool pwm_checkreg(FAR struct sam_pwm_s *chan, bool wr, uint32_t regval,
                          uintptr_t regaddr);
 #else
 # define pwm_checkreg(chan,wr,regval,regaddr) (false)
 #endif
 
-static uint32_t pwm_getreg(struct sam_pwm_chan_s *chan, int offset);
-static void pwm_putreg(struct sam_pwm_chan_s *chan,
-                       int offset, uint32_t regval);
+static uint32_t pwm_getreg(FAR struct sam_pwm_chan_s *chan, int offset);
+static void pwm_putreg(FAR struct sam_pwm_chan_s *chan, int offset, uint32_t regval);
 
 #ifdef CONFIG_DEBUG_PWM_INFO
-static void pwm_dumpregs(struct sam_pwm_chan_s *chan,
-                         const char *msg);
+static void pwm_dumpregs(FAR struct sam_pwm_chan_s *chan, FAR const char *msg);
 #else
 #  define pwm_dumpregs(chan,msg)
 #endif
@@ -319,17 +330,17 @@ static void pwm_dumpregs(struct sam_pwm_chan_s *chan,
 /* PWM Interrupts */
 
 #ifdef PWM_INTERRUPTS
-static int pwm_interrupt(int irq, void *context, void *arg);
+static int pwm_interrupt(int irq, void *context, FAR void *arg);
 #endif
 
 /* PWM driver methods */
 
-static int pwm_setup(struct pwm_lowerhalf_s *dev);
-static int pwm_shutdown(struct pwm_lowerhalf_s *dev);
-static int pwm_start(struct pwm_lowerhalf_s *dev,
-                     const struct pwm_info_s *info);
-static int pwm_stop(struct pwm_lowerhalf_s *dev);
-static int pwm_ioctl(struct pwm_lowerhalf_s *dev,
+static int pwm_setup(FAR struct pwm_lowerhalf_s *dev);
+static int pwm_shutdown(FAR struct pwm_lowerhalf_s *dev);
+static int pwm_start(FAR struct pwm_lowerhalf_s *dev,
+                     FAR const struct pwm_info_s *info);
+static int pwm_stop(FAR struct pwm_lowerhalf_s *dev);
+static int pwm_ioctl(FAR struct pwm_lowerhalf_s *dev,
                      int cmd, unsigned long arg);
 
 /* Initialization */
@@ -339,12 +350,11 @@ static unsigned int pwm_clk_divider(uint32_t mck, uint32_t fclk,
                                     unsigned int prelog2);
 static uint32_t pwm_clk_frequency(uint32_t mck, unsigned int prelog2,
                                   unsigned int div);
-static void pwm_resetpins(struct sam_pwm_chan_s *chan);
+static void pwm_resetpins(FAR struct sam_pwm_chan_s *chan);
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
 /* This is the list of lower half PWM driver methods used by the upper
  * half driver
  */
@@ -529,7 +539,7 @@ static struct sam_pwm_chan_s g_pwm_chan3 =
  ****************************************************************************/
 
 #ifdef CONFIG_SAMA5_PWM_REGDEBUG
-static bool pwm_checkreg(struct sam_pwm_s *pwm, bool wr, uint32_t regval,
+static bool pwm_checkreg(FAR struct sam_pwm_s *pwm, bool wr, uint32_t regval,
                          uintptr_t regaddr)
 {
   if (wr      == pwm->wr &&      /* Same kind of access? */
@@ -753,7 +763,7 @@ static void pwm_chan_putreg(struct sam_pwm_chan_s *chan, int offset,
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_PWM_INFO
-static void pwm_dumpregs(struct sam_pwm_chan_s *chan, const char *msg)
+static void pwm_dumpregs(struct sam_pwm_chan_s *chan, FAR const char *msg)
 {
   pwminfo("PWM: %s\n", msg);
   pwminfo("   CLK: %08x    SR: %08x  IMR1: %08x  ISR1: %08x\n",
@@ -826,7 +836,7 @@ static void pwm_dumpregs(struct sam_pwm_chan_s *chan, const char *msg)
  ****************************************************************************/
 
 #ifdef PWM_INTERRUPTS
-static int pwm_interrupt(int irq, void *context, void *arg)
+static int pwm_interrupt(int irq, void *context, FAR void *arg)
 {
   /* No PWM interrupts are used in the current design */
 
@@ -852,11 +862,11 @@ static int pwm_interrupt(int irq, void *context, void *arg)
  *
  ****************************************************************************/
 
-static int pwm_setup(struct pwm_lowerhalf_s *dev)
+static int pwm_setup(FAR struct pwm_lowerhalf_s *dev)
 {
-  struct sam_pwm_chan_s *chan = (struct sam_pwm_chan_s *)dev;
+  FAR struct sam_pwm_chan_s *chan = (FAR struct sam_pwm_chan_s *)dev;
 
-  pwminfo("Channel %d: H=%08x L=%08x FI=%08x\n",
+  pwminfo("Channel %d: H=%08lx L=%08lx FI=%08lx\n",
           chan->channel, chan->ohpincfg, chan->olpincfg, chan->fipincfg);
 
   /* Configure selected PWM pins */
@@ -895,9 +905,9 @@ static int pwm_setup(struct pwm_lowerhalf_s *dev)
  *
  ****************************************************************************/
 
-static int pwm_shutdown(struct pwm_lowerhalf_s *dev)
+static int pwm_shutdown(FAR struct pwm_lowerhalf_s *dev)
 {
-  struct sam_pwm_chan_s *chan = (struct sam_pwm_chan_s *)dev;
+  FAR struct sam_pwm_chan_s *chan = (FAR struct sam_pwm_chan_s *)dev;
 
   pwminfo("Channel %d\n", chan->channel);
 
@@ -926,10 +936,10 @@ static int pwm_shutdown(struct pwm_lowerhalf_s *dev)
  *
  ****************************************************************************/
 
-static int pwm_start(struct pwm_lowerhalf_s *dev,
-                     const struct pwm_info_s *info)
+static int pwm_start(FAR struct pwm_lowerhalf_s *dev,
+                     FAR const struct pwm_info_s *info)
 {
-  struct sam_pwm_chan_s *chan = (struct sam_pwm_chan_s *)dev;
+  FAR struct sam_pwm_chan_s *chan = (FAR struct sam_pwm_chan_s *)dev;
 #if defined(CONFIG_SAMA5_PWM_CLKA) || defined(CONFIG_SAMA5_PWM_CLKB)
   unsigned int prelog2;
   unsigned int div;
@@ -958,10 +968,8 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
     case PWM_CLKSRC_CLKA:
       {
         regval  = pwm_getreg(chan, SAM_PWM_CLK_OFFSET);
-        prelog2 = (unsigned int)((regval & PWM_CLK_PREA_MASK) >>
-                                  PWM_CLK_PREA_SHIFT);
-        div     = (unsigned int)((regval & PWM_CLK_DIVA_MASK) >>
-                                  PWM_CLK_DIVA_SHIFT);
+        prelog2 = (unsigned int)((regval & PWM_CLK_PREA_MASK) >> PWM_CLK_PREA_SHIFT);
+        div     = (unsigned int)((regval & PWM_CLK_DIVA_MASK) >> PWM_CLK_DIVA_SHIFT);
         mck     = BOARD_MCK_FREQUENCY;
         fsrc    = pwm_clk_frequency(mck, prelog2, div);
         regval  = PWM_CMR_CPRE_CLKA;
@@ -973,10 +981,8 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
     case PWM_CLKSRC_CLKB:
       {
         regval  = pwm_getreg(chan, SAM_PWM_CLK_OFFSET);
-        prelog2 = (unsigned int)((regval & PWM_CLK_PREB_MASK) >>
-                                  PWM_CLK_PREB_SHIFT);
-        div     = (unsigned int)((regval & PWM_CLK_DIVB_MASK) >>
-                                  PWM_CLK_DIVB_SHIFT);
+        prelog2 = (unsigned int)((regval & PWM_CLK_PREB_MASK) >> PWM_CLK_PREB_SHIFT);
+        div     = (unsigned int)((regval & PWM_CLK_DIVB_MASK) >> PWM_CLK_DIVB_SHIFT);
         mck     = BOARD_MCK_FREQUENCY;
         fsrc    = pwm_clk_frequency(mck, prelog2, div);
         regval  = PWM_CMR_CPRE_CLKB;
@@ -985,8 +991,7 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
 #endif
 
     default:
-      pwmerr("ERROR: Invalid or unsupported clock source value: %d\n",
-             chan->clksrc);
+      pwmerr("ERROR: Invalid or unsupported clock source value: %d\n", chan->clksrc);
       return -EINVAL;
     }
 
@@ -1029,7 +1034,7 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
     }
 
   pwm_chan_putreg(chan, SAM_PWM_CDTY_OFFSET, regval);
-  pwminfo("Fsrc=%d cprd=%d cdty=%d\n", fsrc, cprd, regval);
+  pwminfo("Fsrc=%ld cprd=%ld cdty=%ld\n", fsrc, cprd, regval);
 
   /* Enable the channel */
 
@@ -1057,9 +1062,9 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
  *
  ****************************************************************************/
 
-static int pwm_stop(struct pwm_lowerhalf_s *dev)
+static int pwm_stop(FAR struct pwm_lowerhalf_s *dev)
 {
-  struct sam_pwm_chan_s *chan = (struct sam_pwm_chan_s *)dev;
+  FAR struct sam_pwm_chan_s *chan = (FAR struct sam_pwm_chan_s *)dev;
 
   pwminfo("Channel %d\n", chan->channel);
 
@@ -1091,11 +1096,10 @@ static int pwm_stop(struct pwm_lowerhalf_s *dev)
  *
  ****************************************************************************/
 
-static int pwm_ioctl(struct pwm_lowerhalf_s *dev,
-                     int cmd, unsigned long arg)
+static int pwm_ioctl(FAR struct pwm_lowerhalf_s *dev, int cmd, unsigned long arg)
 {
 #ifdef CONFIG_DEBUG_PWM_INFO
-  struct sam_pwm_chan_s *chan = (struct sam_pwm_chan_s *)dev;
+  FAR struct sam_pwm_chan_s *chan = (FAR struct sam_pwm_chan_s *)dev;
 
   /* There are no platform-specific ioctl commands */
 
@@ -1259,7 +1263,7 @@ static uint32_t pwm_clk_frequency(uint32_t mck, unsigned int prelog2,
  *
  ****************************************************************************/
 
-static void pwm_resetpins(struct sam_pwm_chan_s *chan)
+static void pwm_resetpins(FAR struct sam_pwm_chan_s *chan)
 {
   if (chan->ohpincfg)
     {
@@ -1296,9 +1300,9 @@ static void pwm_resetpins(struct sam_pwm_chan_s *chan)
  *
  ****************************************************************************/
 
-struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
+FAR struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 {
-  struct sam_pwm_chan_s *chan;
+  FAR struct sam_pwm_chan_s *chan;
   uint32_t regval;
 
   pwminfo("Channel %d\n", channel);
@@ -1307,7 +1311,6 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
     {
 #ifdef CONFIG_SAMA5_PWM_CHAN0
       case 0:
-
         /* Select the Channel 0 interface */
 
         chan = &g_pwm_chan0;
@@ -1316,7 +1319,6 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 
 #ifdef CONFIG_SAMA5_PWM_CHAN1
       case 1:
-
         /* Select the Channel 1 interface */
 
         chan = &g_pwm_chan1;
@@ -1325,7 +1327,6 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 
 #ifdef CONFIG_SAMA5_PWM_CHAN2
       case 2:
-
         /* Select the Channel 2 interface */
 
         chan = &g_pwm_chan2;
@@ -1334,7 +1335,6 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 
 #ifdef CONFIG_SAMA5_PWM_CHAN3
       case 3:
-
         /* Select the Channel 3 interface */
 
         chan = &g_pwm_chan3;
@@ -1368,10 +1368,8 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 #ifdef CONFIG_SAMA5_PWM_CLKA
       /* Set clock A configuration */
 
-      prelog2  = pwm_clk_prescaler_log2(mck,
-                                        CONFIG_SAMA5_PWM_CLKA_FREQUENCY);
-      div      = pwm_clk_divider(mck,
-                                 CONFIG_SAMA5_PWM_CLKA_FREQUENCY, prelog2);
+      prelog2  = pwm_clk_prescaler_log2(mck, CONFIG_SAMA5_PWM_CLKA_FREQUENCY);
+      div      = pwm_clk_divider(mck, CONFIG_SAMA5_PWM_CLKA_FREQUENCY, prelog2);
       regval   = (PWM_CLK_DIVA(div) | PWM_CLK_PREA_DIV(prelog2));
 #else
       regval   = 0;
@@ -1380,10 +1378,8 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 #ifdef CONFIG_SAMA5_PWM_CLKB
       /* Set clock B configuration */
 
-      prelog2  = pwm_clk_prescaler_log2(mck,
-                                        CONFIG_SAMA5_PWM_CLKB_FREQUENCY);
-      div      = pwm_clk_divider(mck,
-                                 CONFIG_SAMA5_PWM_CLKA_FREQUENCY, prelog2);
+      prelog2  = pwm_clk_prescaler_log2(mck, CONFIG_SAMA5_PWM_CLKB_FREQUENCY);
+      div      = pwm_clk_divider(mck, CONFIG_SAMA5_PWM_CLKA_FREQUENCY, prelog2);
       regval  |= (PWM_CLK_DIVB(div) | PWM_CLK_PREB_DIV(prelog2));
 #endif
 
@@ -1402,6 +1398,7 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
         {
           pwmerr("ERROR: Failed to attach IRQ%d\n", channel);
           return NULL;
+
         }
 #endif
 
@@ -1428,7 +1425,7 @@ struct pwm_lowerhalf_s *sam_pwminitialize(int channel)
 
   /* Return the lower-half driver instance for this channel */
 
-  return (struct pwm_lowerhalf_s *)chan;
+  return (FAR struct pwm_lowerhalf_s *)chan;
 }
 
 #endif /* CONFIG_SAMA5_PWM */
