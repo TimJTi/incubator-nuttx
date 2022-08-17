@@ -68,15 +68,15 @@ arm_vectorirq:
 	 * and r14.
 	 */
 
-	mov	r13, #(PSR_MODE_SVC | PSR_I_BIT)
-	msr	cpsr_c, r13		/* Switch to SVC mode */
+	mov	r13, #(PSR_MODE_SYS | PSR_I_BIT)
+	msr	cpsr_c, r13		/* Switch to SYS mode */
 
 	/* Create a context structure.  First set aside a stack frame
 	 * and store r0-r12 into the frame.
 	 */
 
 	sub	sp, sp, #XCPTCONTEXT_SIZE
-	stmia	sp, {r0-r12}		/* Save the SVC mode regs */
+	stmia	sp, {r0-r12}		/* Save the SYS mode regs */
 
 	mov	r0, #(PSR_MODE_IRQ | PSR_I_BIT)
 	msr	cpsr_c, r0			/* Switch back IRQ mode */
@@ -86,12 +86,12 @@ arm_vectorirq:
 	sub	r3, lr, #4
 	mrs	r4, spsr
 
-	/* Then switch back to SVC mode */
+	/* Then switch back to SYS mode */
 
-	orr	r0, r0, #(PSR_MODE_SVC | PSR_I_BIT)
+	orr	r0, r0, #(PSR_MODE_SYS | PSR_I_BIT)
 	msr	cpsr_c, r0
 
-	/* Get the correct values of SVC r13(sp) and r14(lr) in r1 and r2 */
+	/* Get the correct values of USR/SYS r13(sp) and r14(lr) in r1 and r2 */
 
 	add	r1, sp, #XCPTCONTEXT_SIZE
 	mov	r2, r14
@@ -119,11 +119,23 @@ arm_vectorirq:
 	bl	arm_decodeirq		/* Call the handler */
 #endif
 
-	/* Restore the CPSR, SVC mode registers and return */
+	/* Switch back IRQ mode and return with shadow SPSR */
+
+	mov	r4, #(PSR_MODE_IRQ | PSR_I_BIT)
+	msr	cpsr_c, r4		/* Switch back IRQ mode */
+
+	/* Restore the CPSR, SYS mode registers and return */
 
 	ldr	r0, [sp, #(4*REG_CPSR)]	/* Fetch the return SPSR */
 	msr	spsr_cxsf, r0		/* Set the return mode SPSR */
-	ldmia	sp, {r0-r15}^		/* Return */
+
+	/* Life is simple when everything is IRQ mode */
+
+	mov	r14, sp			/* (IRQ) r14=Register storage area */
+	ldmia	r14!, {r0-r12}		/* Restore common r0-r12 */
+	ldmia	r14, {r13, r14}^	/* Restore user mode r13/r14 */
+	add	r14, r14, #(4*2)	/* (IRQ) r14=address of r15 storage */
+	ldmia	r14, {r15}^		/* Return */
 
 #if CONFIG_ARCH_INTERRUPTSTACK > 3
 .Lirqstacktop:
@@ -137,7 +149,7 @@ arm_vectorirq:
  * Function: arm_vectorsvc
  *
  * Description:
- *   SVC interrupt. We enter the SVC in SVC mode.
+ *   SVC interrupt. We enter the SVC in SYS mode.
  *
  ****************************************************************************/
 
@@ -146,20 +158,34 @@ arm_vectorirq:
 	.type	arm_vectorsvc, %function
 
 arm_vectorsvc:
+	/* On entry, we are in SVC mode.  We are free to use the SVC mode r13
+	 * and r14.
+	 */
+
+	mov	r13, #(PSR_MODE_SYS | PSR_I_BIT)
+	msr	cpsr_c, r13		/* Switch to SYS mode */
 
 	/* Create a context structure.  First set aside a stack frame
 	 * and store r0-r12 into the frame.
 	 */
 
 	sub	sp, sp, #XCPTCONTEXT_SIZE
-	stmia	sp, {r0-r12}		/* Save the SVC mode regs */
+	stmia	sp, {r0-r12}		/* Save the SYS mode regs */
+
+	mov	r0, #(PSR_MODE_SVC | PSR_I_BIT)
+	msr	cpsr_c, r0			/* Switch back SVC mode */
 
 	/* Get the values for r15(pc) and CPSR in r3 and r4 */
 
 	mov	r3, r14			/* Save r14 as the PC as well */
 	mrs	r4, spsr		/* Get the saved CPSR */
 
-	/* Get the correct values of SVC r13(sp) and r14(lr) in r1 and r2 */
+	/* Then switch back to SYS mode */
+
+	orr	r0, r0, #(PSR_MODE_SYS | PSR_I_BIT)
+	msr	cpsr_c, r0
+
+	/* Get the correct values of USR/SYS r13(sp) and r14(lr) in r1 and r2 */
 
 	add	r1, sp, #XCPTCONTEXT_SIZE
 	mov	r2, r14
@@ -177,11 +203,23 @@ arm_vectorsvc:
 	mov	r0, sp			/* Get r0=xcp */
 	bl	arm_syscall		/* Call the handler */
 
-	/* Restore the CPSR, SVC mode registers and return */
+	/* Switch back SVC mode and return with shadow SPSR */
+
+	mov	r4, #(PSR_MODE_SVC | PSR_I_BIT)
+	msr	cpsr_c, r4		/* Switch back SVC mode */
+
+	/* Restore the CPSR, SYS mode registers and return */
 
 	ldr	r0, [sp, #(4*REG_CPSR)]	/* Fetch the return SPSR */
 	msr	spsr_cxsf, r0		/* Set the return mode SPSR */
-	ldmia	sp, {r0-r15}^		/* Return */
+
+	/* Life is simple when everything is SVC mode */
+
+	mov	r14, sp			/* (SVC) r14=Register storage area */
+	ldmia	r14!, {r0-r12}		/* Restore common r0-r12 */
+	ldmia	r14, {r13, r14}^	/* Restore user mode r13/r14 */
+	add	r14, r14, #(4*2)	/* (SVC) r14=address of r15 storage */
+	ldmia	r14, {r15}^		/* Return */
 	.size	arm_vectorsvc, . - arm_vectorsvc
 
 	.align	5
@@ -206,15 +244,15 @@ arm_vectordata:
 	 * r13 and r14
 	 */
 
-	mov	r13, #(PSR_MODE_SVC | PSR_I_BIT)
-	msr	cpsr_c, r13		/* Switch to SVC mode */
+	mov	r13, #(PSR_MODE_SYS | PSR_I_BIT)
+	msr	cpsr_c, r13		/* Switch to SYS mode */
 
 	/* Create a context structure.  First set aside a stack frame
 	 * and store r0-r12 into the frame.
 	 */
 
 	sub	sp, sp, #XCPTCONTEXT_SIZE
-	stmia	sp, {r0-r12}		/* Save the SVC mode regs */
+	stmia	sp, {r0-r12}		/* Save the SYS mode regs */
 
 	mov	r0, #(PSR_MODE_ABT | PSR_I_BIT)
 	msr	cpsr_c, r0		/* Switch back ABT mode */
@@ -224,12 +262,12 @@ arm_vectordata:
 	sub	r3, lr, #8
 	mrs	r4, spsr
 
-	/* Then switch back to SVC mode */
+	/* Then switch back to SYS mode */
 
-	mov	r0, #(PSR_MODE_SVC | PSR_I_BIT)
+	mov	r0, #(PSR_MODE_SYS | PSR_I_BIT)
 	msr	cpsr_c, r0
 
-	/* Get the correct values of SVC r13(sp) and r14(lr) in r1 and r2 */
+	/* Get the correct values of USR/SYS r13(sp) and r14(lr) in r1 and r2 */
 
 	add	r1, sp, #XCPTCONTEXT_SIZE
 	mov	r2, r14
@@ -251,11 +289,23 @@ arm_vectordata:
 #endif
 	bl	arm_dataabort		/* Call the handler */
 
-	/* Restore the CPSR, SVC mode registers and return */
+	/* Switch back ABT mode and return with shadow SPSR */
+
+	mov	r4, #(PSR_MODE_ABT | PSR_I_BIT)
+	msr	cpsr_c, r4		/* Switch back ABT mode */
+
+	/* Restore the CPSR, SYS mode registers and return */
 
 	ldr	r0, [sp, #(4*REG_CPSR)]	/* Fetch the return SPSR */
 	msr	spsr_cxsf, r0		/* Set the return mode SPSR */
-	ldmia	sp, {r0-r15}^		/* Return */
+
+	/* Life is simple when everything is ABT mode */
+
+	mov	r14, sp			/* (ABT) r14=Register storage area */
+	ldmia	r14!, {r0-r12}		/* Restore common r0-r12 */
+	ldmia	r14, {r13, r14}^	/* Restore user mode r13/r14 */
+	add	r14, r14, #(4*2)	/* (ABT) r14=address of r15 storage */
+	ldmia	r14, {r15}^		/* Return */
 	.size	arm_vectordata, . - arm_vectordata
 
 	.align	5
@@ -280,15 +330,15 @@ arm_vectorprefetch:
 	 * r13 and r14
 	 */
 
-	mov	r13, #(PSR_MODE_SVC | PSR_I_BIT)
-	msr	cpsr_c, r13		/* Switch to SVC mode */
+	mov	r13, #(PSR_MODE_SYS | PSR_I_BIT)
+	msr	cpsr_c, r13		/* Switch to SYS mode */
 
 	/* Create a context structure.  First set aside a stack frame
 	 * and store r0-r12 into the frame.
 	 */
 
 	sub	sp, sp, #XCPTCONTEXT_SIZE
-	stmia	sp, {r0-r12}		/* Save the SVC mode regs */
+	stmia	sp, {r0-r12}		/* Save the SYS mode regs */
 
 	mov	r0, #(PSR_MODE_ABT | PSR_I_BIT)
 	msr	cpsr_c, r0		/* Switch back ABT mode */
@@ -298,12 +348,12 @@ arm_vectorprefetch:
 	sub	r3, lr, #4
 	mrs	r4, spsr
 
-	/* Then switch back to SVC mode */
+	/* Then switch back to SYS mode */
 
-	mov	r0, #(PSR_MODE_SVC | PSR_I_BIT)
+	mov	r0, #(PSR_MODE_SYS | PSR_I_BIT)
 	msr	cpsr_c, r0
 
-	/* Get the correct values of SVC r13(sp) and r14(lr) in r1 and r2 */
+	/* Get the correct values of USR/SYS r13(sp) and r14(lr) in r1 and r2 */
 
 	add	r1, sp, #XCPTCONTEXT_SIZE
 	mov	r2, r14
@@ -321,11 +371,23 @@ arm_vectorprefetch:
 	mov	r0, sp			/* Get r0=xcp */
 	bl	arm_prefetchabort	/* Call the handler */
 
-	/* Restore the CPSR, SVC mode registers and return */
+	/* Switch back ABT mode and return with shadow SPSR */
+
+	mov	r4, #(PSR_MODE_ABT | PSR_I_BIT)
+	msr	cpsr_c, r4		/* Switch back ABT mode */
+
+	/* Restore the CPSR, SYS mode registers and return */
 
 	ldr	r0, [sp, #(4*REG_CPSR)]	/* Fetch the return SPSR */
 	msr	spsr_cxsf, r0		/* Set the return mode SPSR */
-	ldmia	sp, {r0-r15}^		/* Return */
+
+	/* Life is simple when everything is ABT mode */
+
+	mov	r14, sp			/* (ABT) r14=Register storage area */
+	ldmia	r14!, {r0-r12}		/* Restore common r0-r12 */
+	ldmia	r14, {r13, r14}^	/* Restore user mode r13/r14 */
+	add	r14, r14, #(4*2)	/* (ABT) r14=address of r15 storage */
+	ldmia	r14, {r15}^		/* Return */
 	.size	arm_vectorprefetch, . - arm_vectorprefetch
 
 	.align	5
@@ -348,15 +410,15 @@ arm_vectorundefinsn:
 	 * r13 and r14
 	 */
 
-	mov	r13, #(PSR_MODE_SVC | PSR_I_BIT)
-	msr	cpsr_c, r13		/* Switch to SVC mode */
+	mov	r13, #(PSR_MODE_SYS | PSR_I_BIT)
+	msr	cpsr_c, r13		/* Switch to SYS mode */
 
 	/* Create a context structure.  First set aside a stack frame
 	 * and store r0-r12 into the frame.
 	 */
 
 	sub	sp, sp, #XCPTCONTEXT_SIZE
-	stmia	sp, {r0-r12}		/* Save the SVC mode regs */
+	stmia	sp, {r0-r12}		/* Save the SYS mode regs */
 
 	mov	r0, #(PSR_MODE_UND | PSR_I_BIT)
 	msr	cpsr_c, r0		/* Switch back UND mode */
@@ -366,12 +428,12 @@ arm_vectorundefinsn:
 	mov	r3, lr
 	mrs	r4, spsr
 
-	/* Then switch back to SVC mode */
+	/* Then switch back to SYS mode */
 
-	mov	r0, #(PSR_MODE_SVC | PSR_I_BIT)
+	mov	r0, #(PSR_MODE_SYS | PSR_I_BIT)
 	msr	cpsr_c, r0
 
-	/* Get the correct values of SVC r13(sp) and r14(lr) in r1 and r2 */
+	/* Get the correct values of USR/SYS r13(sp) and r14(lr) in r1 and r2 */
 
 	add	r1, sp, #XCPTCONTEXT_SIZE
 	mov	r2, r14
@@ -389,11 +451,23 @@ arm_vectorundefinsn:
 	mov	r0, sp			/* Get r0=xcp */
 	bl	arm_undefinedinsn	/* Call the handler */
 
-	/* Restore the CPSR, SVC mode registers and return */
+	/* Switch back UND mode and return with shadow SPSR */
+
+	mov	r4, #(PSR_MODE_UND | PSR_I_BIT)
+	msr	cpsr_c, r4		/* Switch back UND mode */
+
+	/* Restore the CPSR, SYS mode registers and return */
 
 	ldr	r0, [sp, #(4*REG_CPSR)]	/* Fetch the return SPSR */
 	msr	spsr_cxsf, r0		/* Set the return mode SPSR */
-	ldmia	sp, {r0-r15}^		/* Return */
+
+	/* Life is simple when everything is UND mode */
+
+	mov	r14, sp			/* (FIQ) r14=Register storage area */
+	ldmia	r14!, {r0-r7}		/* Restore common r0-r7 */
+	ldmia	r14, {r8-r14}^		/* Restore user mode r8-r14 */
+	add	r14, r14, #(4*7)	/* (FIQ) r14=address of r15 storage */
+	ldmia	r14, {r15}^		/* Return */
 	.size	arm_vectorundefinsn, . - arm_vectorundefinsn
 
 	.align	5

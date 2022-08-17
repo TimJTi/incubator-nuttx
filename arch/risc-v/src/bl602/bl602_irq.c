@@ -33,10 +33,9 @@
 #include <nuttx/board.h>
 #include <arch/irq.h>
 #include <arch/board/board.h>
+#include <arch/csr.h>
 
 #include "riscv_internal.h"
-#include "riscv_arch.h"
-
 #include "hardware/bl602_clic.h"
 
 #include "chip.h"
@@ -88,11 +87,11 @@ void up_irqinitialize(void)
 
   /* currents_regs is non-NULL only while processing an interrupt */
 
-  g_current_regs = NULL;
+  CURRENT_REGS = NULL;
 
   /* Attach the ecall interrupt handler */
 
-  irq_attach(BL602_IRQ_ECALLM, riscv_swint, NULL);
+  irq_attach(RISCV_IRQ_ECALLM, riscv_swint, NULL);
 
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
 
@@ -112,26 +111,24 @@ void up_irqinitialize(void)
 
 void up_disable_irq(int irq)
 {
-  uint32_t oldstat;
-
-  if (irq == BL602_IRQ_MSOFT)
+  if (irq == RISCV_IRQ_MSOFT)
     {
       /* Read mstatus & clear machine software interrupt enable in mie */
 
-      asm volatile("csrrc %0, mie, %1" : "=r"(oldstat) : "r"(MIE_MSIE));
+      CLEAR_CSR(mie, MIE_MSIE);
     }
-  else if (irq == BL602_IRQ_MTIMER)
+  else if (irq == RISCV_IRQ_MTIMER)
     {
       putreg8(0, CLIC_TIMER_ENABLE_ADDRESS);
 
       /* Read mstatus & clear machine timer interrupt enable in mie */
 
-      asm volatile("csrrc %0, mie, %1" : "=r"(oldstat) : "r"(MIE_MTIE));
+      CLEAR_CSR(mie, MIE_MTIE);
     }
   else
     {
-      ASSERT(irq < 64 + 16 + BL602_IRQ_ASYNC);
-      bl_irq_disable(irq - BL602_IRQ_ASYNC);
+      ASSERT(irq < 64 + 16 + RISCV_IRQ_ASYNC);
+      bl_irq_disable(irq - RISCV_IRQ_ASYNC);
     }
 }
 
@@ -145,28 +142,24 @@ void up_disable_irq(int irq)
 
 void up_enable_irq(int irq)
 {
-  uint32_t oldstat;
-
-  if (irq == BL602_IRQ_MSOFT)
+  if (irq == RISCV_IRQ_MSOFT)
     {
       /* Read mstatus & set machine software interrupt enable in mie */
 
-      asm volatile("csrrs %0, mie, %1" : "=r"(oldstat) : "r"(MIE_MSIE));
+      SET_CSR(mie, MIE_MSIE);
     }
-  else if (irq == BL602_IRQ_MTIMER)
+  else if (irq == RISCV_IRQ_MTIMER)
     {
       putreg8(1, CLIC_TIMER_ENABLE_ADDRESS);
 
       /* Read mstatus & set machine timer interrupt enable in mie */
 
-      asm volatile("csrrs %0, mie, %1"
-                   : "=r"(oldstat)
-                   : "r"(MIE_MTIE | 0x1 << 11));
+      SET_CSR(mie, MIE_MTIE | 0x1 << 11);
     }
   else
     {
-      ASSERT(irq < 64 + 16 + BL602_IRQ_ASYNC);
-      bl_irq_enable(irq - BL602_IRQ_ASYNC);
+      ASSERT(irq < 64 + 16 + RISCV_IRQ_ASYNC);
+      bl_irq_enable(irq - RISCV_IRQ_ASYNC);
     }
 }
 
@@ -217,10 +210,10 @@ irqstate_t up_irq_enable(void)
 
   /* Enable MEIE (machine external interrupt enable) */
 
-  asm volatile("csrrs %0, mie, %1" : "=r"(oldstat) : "r"(MIE_MEIE));
+  SET_CSR(mie, MIE_MEIE);
 
   /* Read mstatus & set machine interrupt enable (MIE) in mstatus */
 
-  asm volatile("csrrs %0, mstatus, %1" : "=r"(oldstat) : "r"(MSTATUS_MIE));
+  oldstat = READ_AND_SET_CSR(mstatus, MSTATUS_MIE);
   return oldstat;
 }

@@ -54,6 +54,8 @@
 #define BATIOC_CHGDSG        _BATIOC(0x000E)
 #define BATIOC_CLEARFAULTS   _BATIOC(0x000F)
 #define BATIOC_COULOMBS      _BATIOC(0x0010)
+#define BATIOC_CHIPID        _BATIOC(0x0011)
+#define BATIOC_GET_VOLTAGE   _BATIOC(0x0012)
 
 /* Special input values for BATIOC_INPUT_CURRENT that may optionally
  * be supported by lower-half driver:
@@ -120,7 +122,6 @@ struct batio_operate_msg_s
   };
 };
 
-#if defined(CONFIG_I2C_BQ2429X)
 enum batio_operate_e
 {
   BATIO_OPRTN_NOP = 0,
@@ -134,6 +135,5 @@ enum batio_operate_e
   BATIO_OPRTN_WDOG,
   BATIO_OPRTN_END
 };
-#endif
 
 #endif /* __INCLUDE_NUTTX_POWER_BATTERY_IOCTL_H */

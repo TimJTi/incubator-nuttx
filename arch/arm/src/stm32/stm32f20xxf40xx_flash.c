@@ -41,8 +41,7 @@
 #include "stm32_flash.h"
 #include "stm32_rcc.h"
 #include "stm32_waste.h"
-
-#include "arm_arch.h"
+#include "arm_internal.h"
 
 /* Only for the STM32F[2|4]0xx family. */
 
@@ -247,6 +246,11 @@ size_t up_progmem_pagesize(size_t page)
     {
       return page_sizes[page];
     }
+}
+
+size_t up_progmem_erasesize(size_t block)
+{
+  return up_progmem_pagesize(block);
 }
 
 ssize_t up_progmem_getpage(size_t addr)

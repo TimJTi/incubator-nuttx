@@ -44,8 +44,6 @@
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
-#include "arm_arch.h"
-
 #include "chip.h"
 #include "stm32_rcc.h"
 #include "stm32_gpio.h"
@@ -1810,6 +1808,7 @@ FAR struct spi_slave_ctrlr_s *stm32_spi_slave_initialize(int bus)
 #endif
     {
       spierr("ERROR: Unsupported SPI bus: %d\n", bus);
+      leave_critical_section(flags);
       return NULL;
     }
 

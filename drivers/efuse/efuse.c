@@ -36,7 +36,6 @@
 #include <nuttx/fs/fs.h>
 #include <nuttx/irq.h>
 #include <nuttx/kmalloc.h>
-#include <nuttx/power/pm.h>
 #include <nuttx/semaphore.h>
 #include <nuttx/efuse/efuse.h>
 
@@ -88,6 +87,9 @@ static const struct file_operations g_efuseops =
   NULL,        /* seek */
   efuse_ioctl, /* ioctl */
   NULL         /* poll */
+#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+  , NULL       /* unlink */
+#endif
 };
 
 /****************************************************************************

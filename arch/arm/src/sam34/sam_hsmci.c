@@ -44,8 +44,7 @@
 #include <arch/board/board.h>
 
 #include "chip.h"
-#include "arm_arch.h"
-
+#include "arm_internal.h"
 #include "sam_gpio.h"
 #include "sam_cmcc.h"
 #include "sam_hsmci.h"
@@ -1964,7 +1963,7 @@ static int sam_waitresponse(FAR struct sdio_dev_s *dev, uint32_t cmd)
 
   for (; ; )
     {
-      /* Did a Command-Response sequence termination evernt occur? */
+      /* Did a Command-Response sequence termination event occur? */
 
       sr      = getreg32(SAM_HSMCI_SR);
       pending = sr & priv->cmdrmask;

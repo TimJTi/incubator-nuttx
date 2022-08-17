@@ -36,7 +36,8 @@ $(ETCSRC): $(RCRAWS) $(RCOBJS)
 	  $(shell mkdir -p $(dir $(ETCDIR)$(DELIM)$(raw))) \
 	  $(shell cp -rfp $(raw) $(ETCDIR)$(DELIM)$(raw)))
 	$(Q) genromfs -f romfs.img -d $(ETCDIR)$(DELIM)$(CONFIG_NSH_ROMFSMOUNTPT) -V "$(basename $<)"
-	$(Q) xxd -i romfs.img | sed -e "s/^unsigned/const unsigned/g" > $@
+	$(Q) echo "#include <nuttx/compiler.h>" > $@
+	$(Q) xxd -i romfs.img | sed -e "s/^unsigned char/const unsigned char aligned_data(4)/g" >> $@
 	$(Q) rm romfs.img
 endif
 
@@ -70,11 +71,7 @@ all: libboard$(LIBEXT)
 
 ifneq ($(ZDSVERSION),)
 $(ASRCS) $(HEAD_ASRC): %$(ASMEXT): %.S
-ifeq ($(CONFIG_CYGWIN_WINTOOL),y)
-	$(Q) $(CPP) $(CPPFLAGS) `cygpath -w $<` -o $@.tmp
-else
-	$(Q) $(CPP) $(CPPFLAGS) $< -o $@.tmp
-endif
+	$(Q) $(CPP) $(CPPFLAGS) $(call CONVERT_PATH,$<) -o $@.tmp
 	$(Q) cat $@.tmp | sed -e "s/^#/;/g" > $@
 	$(Q) rm $@.tmp
 endif

@@ -32,8 +32,7 @@
 #include <arch/board/board.h>
 #include <nuttx/spinlock.h>
 
-#include "riscv_arch.h"
-
+#include "riscv_internal.h"
 #include "mpfs.h"
 #include "mpfs_clockconfig.h"
 
@@ -120,7 +119,7 @@ void up_timer_initialize(void)
 
   /* Attach timer interrupt handler */
 
-  irq_attach(MPFS_IRQ_MTIMER, mpfs_timerisr, NULL);
+  irq_attach(RISCV_IRQ_MTIMER, mpfs_timerisr, NULL);
 
   /* Reload CLINT mtimecmp */
 
@@ -128,5 +127,5 @@ void up_timer_initialize(void)
 
   /* And enable the timer interrupt */
 
-  up_enable_irq(MPFS_IRQ_MTIMER);
+  up_enable_irq(RISCV_IRQ_MTIMER);
 }

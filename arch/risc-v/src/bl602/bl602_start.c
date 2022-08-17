@@ -36,7 +36,6 @@
 # include "sched/sched.h"
 #endif
 
-#include "riscv_arch.h"
 #include "riscv_internal.h"
 #include "chip.h"
 
@@ -76,13 +75,13 @@ uint8_t g_idle_stack[BL602_IDLESTACK_SIZE]
  * g_boot2_partition_table in linker script
  */
 
-static struct boot2_partition_table_s g_boot2_partition_table unused_data;
+static struct boot2_partition_table_s g_boot2_partition_table used_data;
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-uint32_t g_idle_topstack = 0;
+uintptr_t g_idle_topstack;
 
 /****************************************************************************
  * Public Functions

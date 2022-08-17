@@ -32,7 +32,6 @@
 #include "chip.h"
 #include "nvic.h"
 #include "ram_vectors.h"
-#include "arm_arch.h"
 #include "arm_internal.h"
 
 /****************************************************************************
@@ -62,11 +61,8 @@
  * processing.  Access to g_current_regs[] must be through the macro
  * CURRENT_REGS for portability.
  */
-#ifdef CONFIG_SMP
+
 volatile uint32_t *g_current_regs[CONFIG_SMP_NCPUS];
-#else
-volatile uint32_t *g_current_regs[1];
-#endif
 
 /* extern int32_t    __StackLimit; */
 

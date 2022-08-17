@@ -44,9 +44,7 @@
 #include <arch/board/board.h>
 
 #include "chip.h"
-#include "arm_arch.h"
 #include "arm_internal.h"
-
 #include "stm32_otgfs.h"
 
 #if defined(CONFIG_USBDEV) && (defined(CONFIG_STM32_OTGFS))
@@ -5623,7 +5621,11 @@ void arm_usbinitialize(void)
 
   stm32_configgpio(GPIO_OTGFS_DM);
   stm32_configgpio(GPIO_OTGFS_DP);
-  stm32_configgpio(GPIO_OTGFS_ID);    /* Only needed for OTG */
+
+  /* Only needed for OTG */
+#ifndef CONFIG_OTG_ID_GPIO_DISABLE
+  stm32_configgpio(GPIO_OTGFS_ID);
+#endif
 
   /* SOF output pin configuration is configurable. */
 

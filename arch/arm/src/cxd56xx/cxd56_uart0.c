@@ -37,7 +37,7 @@
 #include <debug.h>
 #include <errno.h>
 
-#include "arm_arch.h"
+#include "arm_internal.h"
 #include "chip.h"
 #include "cxd56_pinconfig.h"
 
@@ -99,7 +99,7 @@ static const struct file_operations g_uart0fops =
   .close = uart0_close,
   .read  = uart0_read,
   .write = uart0_write,
-  .seek  = 0,
+  .seek  = NULL,
   .ioctl = uart0_ioctl,
 };
 

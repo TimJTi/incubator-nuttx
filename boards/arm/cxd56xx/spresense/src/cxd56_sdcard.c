@@ -39,7 +39,7 @@
 #include <nuttx/wqueue.h>
 
 #include "chip.h"
-#include "arm_arch.h"
+#include "arm_internal.h"
 
 #include <arch/board/board.h>
 #include <arch/chip/pin.h>
@@ -82,7 +82,8 @@ static struct work_s g_sdcard_work;
 #endif
 
 static struct pm_cpu_freqlock_s g_hv_lock =
-  PM_CPUFREQLOCK_INIT(PM_CPUFREQLOCK_TAG('S','D',0), PM_CPUFREQLOCK_FLAG_HV);
+  PM_CPUFREQLOCK_INIT(PM_CPUFREQLOCK_TAG('S', 'D', 0),
+                      PM_CPUFREQLOCK_FLAG_HV);
 
 /****************************************************************************
  * Private Functions
@@ -348,7 +349,7 @@ int board_sdcard_initialize(void)
                              NULL);
   if (ret < 0)
     {
-      _err("ERROR: Failed to configure GPIO int. \n");
+      _err("ERROR: Failed to configure GPIO int.\n");
     }
 
   /* Enabling Interrupt */

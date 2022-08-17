@@ -125,7 +125,10 @@ static const struct file_operations g_ramlogfops =
 
 #ifdef CONFIG_RAMLOG_SYSLOG
 static char g_sysbuffer[CONFIG_RAMLOG_BUFSIZE]
-                               locate_data(CONFIG_RAMLOG_BUFFER_SECTION);
+#ifdef CONFIG_RAMLOG_BUFFER_SECTION
+                               locate_data(CONFIG_RAMLOG_BUFFER_SECTION)
+#endif
+;
 
 /* This is the device structure for the console or syslogging function.  It
  * must be statically initialized because the RAMLOG ramlog_putc function
@@ -748,8 +751,8 @@ static int ramlog_file_poll(FAR struct file *filep, FAR struct pollfd *fds,
 
       /* Remove all memory of the poll setup */
 
-      *slot      = NULL;
-      fds->priv  = NULL;
+      *slot     = NULL;
+      fds->priv = NULL;
     }
 
 errout:

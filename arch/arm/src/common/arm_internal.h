@@ -29,6 +29,7 @@
 
 #ifndef __ASSEMBLY__
 #  include <nuttx/compiler.h>
+#  include <nuttx/arch.h>
 #  include <sys/types.h>
 #  include <stdint.h>
 #endif
@@ -68,11 +69,25 @@
 #  define USE_SERIALDRIVER 1
 #endif
 
+/* For use with EABI and floating point, the stack must be aligned to 8-byte
+ * addresses.
+ */
+
+#define STACK_ALIGNMENT     8
+
+/* Stack alignment macros */
+
+#define STACK_ALIGN_MASK    (STACK_ALIGNMENT - 1)
+#define STACK_ALIGN_DOWN(a) ((a) & ~STACK_ALIGN_MASK)
+#define STACK_ALIGN_UP(a)   (((a) + STACK_ALIGN_MASK) & ~STACK_ALIGN_MASK)
+
 /* Check if an interrupt stack size is configured */
 
 #ifndef CONFIG_ARCH_INTERRUPTSTACK
 #  define CONFIG_ARCH_INTERRUPTSTACK 0
 #endif
+
+#define INTSTACK_SIZE (CONFIG_ARCH_INTERRUPTSTACK & ~STACK_ALIGN_MASK)
 
 /* Macros to handle saving and restoring interrupt state.  In the current ARM
  * model, the state is always copied to and from the stack and TCB.  In the
@@ -153,6 +168,10 @@
 #  define _DATA_INIT   &_eronly
 #  define _START_DATA  &_sdata
 #  define _END_DATA    &_edata
+#  define _START_TDATA &_stdata
+#  define _END_TDATA   &_etdata
+#  define _START_TBSS  &_stbss
+#  define _END_TBSS    &_etbss
 #endif
 
 /* This is the value used to mark the stack for subsequent stack monitoring
@@ -162,6 +181,19 @@
 #define STACK_COLOR    0xdeadbeef
 #define INTSTACK_COLOR 0xdeadbeef
 #define HEAP_COLOR     'h'
+
+#define getreg8(a)     (*(volatile uint8_t *)(a))
+#define putreg8(v,a)   (*(volatile uint8_t *)(a) = (v))
+#define getreg16(a)    (*(volatile uint16_t *)(a))
+#define putreg16(v,a)  (*(volatile uint16_t *)(a) = (v))
+#define getreg32(a)    (*(volatile uint32_t *)(a))
+#define putreg32(v,a)  (*(volatile uint32_t *)(a) = (v))
+
+/* Non-atomic, but more effective modification of registers */
+
+#define modreg8(v,m,a)  putreg8((getreg8(a) & ~(m)) | ((v) & (m)), (a))
+#define modreg16(v,m,a) putreg16((getreg16(a) & ~(m)) | ((v) & (m)), (a))
+#define modreg32(v,m,a) putreg32((getreg32(a) & ~(m)) | ((v) & (m)), (a))
 
 /****************************************************************************
  * Public Types
@@ -190,21 +222,12 @@ extern "C"
  * CURRENT_REGS for portability.
  */
 
-#ifdef CONFIG_SMP
 /* For the case of architectures with multiple CPUs, then there must be one
  * such value for each processor that can receive an interrupt.
  */
 
-int up_cpu_index(void); /* See include/nuttx/arch.h */
 EXTERN volatile uint32_t *g_current_regs[CONFIG_SMP_NCPUS];
-#  define CURRENT_REGS (g_current_regs[up_cpu_index()])
-
-#else
-
-EXTERN volatile uint32_t *g_current_regs[1];
-#  define CURRENT_REGS (g_current_regs[0])
-
-#endif
+#define CURRENT_REGS (g_current_regs[up_cpu_index()])
 
 /* This is the beginning of heap as provided from arm_head.S.
  * This is the first address in DRAM after the loaded
@@ -226,10 +249,10 @@ EXTERN uint32_t g_intstacktop;   /* Initial top of interrupt stack */
  * meaningfully in the following way:
  *
  *  - The linker script defines, for example, the symbol_sdata.
- *  - The declareion extern uint32_t _sdata; makes C happy.  C will believe
+ *  - The declaration extern uint32_t _sdata; makes C happy.  C will believe
  *    that the value _sdata is the address of a uint32_t variable _data (it
  *    is not!).
- *  - We can recoved the linker value then by simply taking the address of
+ *  - We can recover the linker value then by simply taking the address of
  *    of _data.  like:  uint32_t *pdata = &_sdata;
  */
 
@@ -240,6 +263,10 @@ EXTERN uint32_t _sdata;           /* Start of .data */
 EXTERN uint32_t _edata;           /* End+1 of .data */
 EXTERN uint32_t _sbss;            /* Start of .bss */
 EXTERN uint32_t _ebss;            /* End+1 of .bss */
+EXTERN uint32_t _stdata;          /* Start of .tdata */
+EXTERN uint32_t _etdata;          /* End+1 of .tdata */
+EXTERN uint32_t _stbss;           /* Start of .tbss */
+EXTERN uint32_t _etbss;           /* End+1 of .tbss */
 
 /* Sometimes, functions must be executed from RAM.  In this case, the
  * following macro may be used (with GCC!) to specify a function that will
@@ -287,6 +314,11 @@ EXTERN uint32_t _eramfuncs;       /* Copy destination end address in RAM */
  ****************************************************************************/
 
 #ifndef __ASSEMBLY__
+/* Atomic modification of registers */
+
+void modifyreg8(unsigned int addr, uint8_t clearbits, uint8_t setbits);
+void modifyreg16(unsigned int addr, uint16_t clearbits, uint16_t setbits);
+void modifyreg32(unsigned int addr, uint32_t clearbits, uint32_t setbits);
 
 /* Low level initialization provided by board-level logic *******************/
 
@@ -317,6 +349,11 @@ void arm_pminitialize(void);
 
 /* Interrupt handling *******************************************************/
 
+#if defined(CONFIG_SMP) && CONFIG_ARCH_INTERRUPTSTACK > 7
+uintptr_t arm_intstack_alloc(void);
+uintptr_t arm_intstack_top(void);
+#endif
+
 /* Exception handling logic unique to the Cortex-M family */
 
 #if defined(CONFIG_ARCH_ARMV6M) || defined(CONFIG_ARCH_ARMV7M) || \
@@ -335,6 +372,9 @@ int  arm_hardfault(int irq, FAR void *context, FAR void *arg);
 #  if defined(CONFIG_ARCH_ARMV7M) || defined(CONFIG_ARCH_ARMV8M)
 
 int  arm_memfault(int irq, FAR void *context, FAR void *arg);
+int  arm_busfault(int irq, FAR void *context, FAR void *arg);
+int  arm_usagefault(int irq, FAR void *context, FAR void *arg);
+int  arm_securefault(int irq, FAR void *context, FAR void *arg);
 
 #  endif /* CONFIG_ARCH_CORTEXM3,4,7 */
 
@@ -387,7 +427,7 @@ void arm_dataabort(uint32_t *regs);
 /* Exception handlers */
 
 void arm_prefetchabort(uint32_t *regs);
-void arm_syscall(uint32_t *regs);
+uint32_t *arm_syscall(uint32_t *regs);
 void arm_undefinedinsn(uint32_t *regs);
 
 #endif /* CONFIG_ARCH_ARMV[6-8]M */
@@ -413,7 +453,6 @@ void arm_restorefpu(const uint32_t *regs);
 /* Low level serial output **************************************************/
 
 void arm_lowputc(char ch);
-void up_puts(const char *str);
 void arm_lowputs(const char *str);
 
 #ifdef USE_SERIALDRIVER
@@ -422,14 +461,6 @@ void arm_serialinit(void);
 
 #ifdef USE_EARLYSERIALINIT
 void arm_earlyserialinit(void);
-#endif
-
-#ifdef CONFIG_RPMSG_UART
-void rpmsg_serialinit(void);
-#endif
-
-#ifdef CONFIG_LWL_CONSOLE
-void lwlconsole_init(void);
 #endif
 
 /* DMA **********************************************************************/
@@ -453,10 +484,6 @@ void arm_addregion(void);
 #else
 # define arm_addregion()
 #endif
-
-/* Watchdog timer ***********************************************************/
-
-void arm_wdtinit(void);
 
 /* Networking ***************************************************************/
 

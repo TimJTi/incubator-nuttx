@@ -66,13 +66,10 @@
 static void _xtensa_dumponexit(struct tcb_s *tcb, void *arg)
 {
   struct filelist *filelist;
-#ifdef CONFIG_FILE_STREAM
-  struct file_struct *filep;
-#endif
   int i;
   int j;
 
-  sinfo("  TCB=%p name=%s pid=%d\n", tcb, tcb->argv[0], tcb->pid);
+  sinfo("  TCB=%p name=%s pid=%d\n", tcb, tcb->name, tcb->pid);
   sinfo("    priority=%d state=%d\n", tcb->sched_priority, tcb->task_state);
 
   filelist = tcb->group->tg_filelist;
@@ -89,28 +86,6 @@ static void _xtensa_dumponexit(struct tcb_s *tcb, void *arg)
             }
         }
     }
-
-#ifdef CONFIG_FILE_STREAM
-  filep = tcb->group->tg_streamlist->sl_head;
-  for (; filep != NULL; filep = filep->fs_next)
-    {
-      if (filep->fs_fd >= 0)
-        {
-#ifndef CONFIG_STDIO_DISABLE_BUFFERING
-          if (filep->fs_bufstart != NULL)
-            {
-              sinfo("      fd=%d nbytes=%d\n",
-                    filep->fs_fd,
-                    filep->fs_bufpos - filep->fs_bufstart);
-            }
-          else
-#endif
-            {
-              sinfo("      fd=%d\n", filep->fs_fd);
-            }
-        }
-    }
-#endif
 }
 #endif
 
@@ -168,12 +143,6 @@ void up_exit(int status)
 
   nxsched_resume_scheduler(tcb);
 
-#if XCHAL_CP_NUM > 0
-  /* Set up the co-processor state for the newly started thread. */
-
-  xtensa_coproc_restorestate(&tcb->xcp.cpstate);
-#endif
-
 #ifdef CONFIG_ARCH_ADDRENV
   /* Make sure that the address environment for the previously running
    * task is closed down gracefully (data caches dump, MMU flushed) and
@@ -188,7 +157,7 @@ void up_exit(int status)
 
   xtensa_context_restore(tcb->xcp.regs);
 
-  /* xtensa_full_context_restore() should not return but could if the
+  /* xtensa_context_restore() should not return but could if the
    * software interrupts are disabled.
    */
 

@@ -89,8 +89,6 @@
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
-#include "arm_arch.h"
-
 #include "chip.h"
 #include "hardware/sam_pinmap.h"
 #include "hardware/sam_fuses.h"
@@ -7610,7 +7608,7 @@ static ssize_t sam_transfer(FAR struct usbhost_driver_s *drvr,
                             FAR uint8_t *buffer,
                             size_t buflen)
 {
-  FAR struct sam_usbhost_s *priv  = (FAR struct sam_usbhost_s *)drvr;
+  FAR struct sam_usbhost_s *priv = (FAR struct sam_usbhost_s *)drvr;
   FAR struct sam_pipe_s *pipe;
   unsigned int idx = (unsigned int)ep;
   ssize_t nbytes;
@@ -7682,7 +7680,7 @@ static int sam_asynch(FAR struct usbhost_driver_s *drvr, usbhost_ep_t ep,
                         FAR uint8_t *buffer, size_t buflen,
                         usbhost_asynch_t callback, FAR void *arg)
 {
-  FAR struct sam_usbhost_s *priv  = (FAR struct sam_usbhost_s *)drvr;
+  FAR struct sam_usbhost_s *priv = (FAR struct sam_usbhost_s *)drvr;
   FAR struct sam_pipe_s *pipe;
   unsigned int idx = (unsigned int)ep;
   int ret;
@@ -7735,7 +7733,7 @@ static int sam_asynch(FAR struct usbhost_driver_s *drvr, usbhost_ep_t ep,
 
 static int sam_cancel(FAR struct usbhost_driver_s *drvr, usbhost_ep_t ep)
 {
-  FAR struct sam_usbhost_s *priv  = (FAR struct sam_usbhost_s *)drvr;
+  FAR struct sam_usbhost_s *priv = (FAR struct sam_usbhost_s *)drvr;
   FAR struct sam_pipe_s *pipe;
   unsigned int idx = (unsigned int)ep;
   irqstate_t flags;

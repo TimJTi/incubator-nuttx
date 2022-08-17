@@ -21,12 +21,13 @@
 #ifndef __INCLUDE_ASSERT_H
 #define __INCLUDE_ASSERT_H
 
+#ifndef __ASSEMBLY__
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/compiler.h>
-#include <stdint.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -56,7 +57,7 @@
 #  define DEBUGVERIFY(f) VERIFY(f)
 #else
 #  define DEBUGPANIC()
-#  define DEBUGASSERT(f) UNUSED(f)
+#  define DEBUGASSERT(f) ((void)(1 || (f)))
 #  define DEBUGVERIFY(f) ((void)(f))
 #endif
 
@@ -66,7 +67,7 @@
  */
 
 #ifdef NDEBUG
-#  define assert(f) UNUSED(f)
+#  define assert(f) ((void)(1 || (f)))
 #else
 #  define assert(f) ASSERT(f)
 #endif
@@ -106,4 +107,5 @@ void _assert(FAR const char *filename, int linenum) noreturn_function;
 }
 #endif
 
+#endif /* __ASSEMBLY__ */
 #endif /* __INCLUDE_ASSERT_H */

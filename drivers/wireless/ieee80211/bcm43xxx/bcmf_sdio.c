@@ -37,8 +37,8 @@
 #include <nuttx/arch.h>
 #include <nuttx/kthread.h>
 #include <nuttx/wdog.h>
+#include <nuttx/sdio.h>
 
-#include <nuttx/wireless/ieee80211/mmc_sdio.h>
 #include <nuttx/wireless/ieee80211/bcmf_sdio.h>
 #include <nuttx/wireless/ieee80211/bcmf_board.h>
 
@@ -80,6 +80,9 @@
 #endif
 #ifdef CONFIG_IEEE80211_BROADCOM_BCM43438
   extern const struct bcmf_sdio_chip bcmf_43438_config_sdio;
+#endif
+#ifdef CONFIG_IEEE80211_BROADCOM_BCM43455
+  extern const struct bcmf_sdio_chip bcmf_43455_config_sdio;
 #endif
 
 /****************************************************************************
@@ -208,6 +211,9 @@ int bcmf_sdio_bus_sleep(FAR struct bcmf_sdio_dev_s *sbus, bool sleep)
 int bcmf_probe(FAR struct bcmf_sdio_dev_s *sbus)
 {
   int ret;
+#ifdef CONFIG_IEEE80211_BROADCOM_SDIO_EHS_MODE
+  uint8_t value;
+#endif
 
   /* Probe sdio card compatible device */
 
@@ -246,9 +252,35 @@ int bcmf_probe(FAR struct bcmf_sdio_dev_s *sbus)
       goto exit_error;
     }
 
-  /* Default device clock speed is up to 25 MHz
+#ifdef CONFIG_IEEE80211_BROADCOM_SDIO_EHS_MODE
+  /* Default device clock speed is up to 25 MHz.
    * We could set EHS bit to operate at a clock rate up to 50 MHz.
    */
+
+  ret = bcmf_read_reg(sbus, 0, SDIO_CCCR_HIGHSPEED, &value);
+  if (ret != OK)
+    {
+      goto exit_error;
+    }
+
+  if (value & SDIO_CCCR_HIGHSPEED_SHS)
+    {
+      /* If the chip confirms its High-Speed capability,
+       * enable the High-Speed mode.
+       */
+
+      ret = bcmf_write_reg(sbus, 0, SDIO_CCCR_HIGHSPEED,
+                           SDIO_CCCR_HIGHSPEED_EHS);
+      if (ret != OK)
+        {
+          goto exit_error;
+        }
+    }
+  else
+    {
+      wlwarn("High-Speed mode is not supported by the chip!\n");
+    }
+#endif
 
   SDIO_CLOCK(sbus->sdio_dev, CLOCK_SD_TRANSFER_4BIT);
   up_mdelay(BCMF_CLOCK_SETUP_DELAY_MS);
@@ -792,6 +824,13 @@ int bcmf_chipinitialize(FAR struct bcmf_sdio_dev_s *sbus)
       case SDIO_DEVICE_ID_BROADCOM_43430:
         wlinfo("bcm43438 chip detected\n");
         sbus->chip = (struct bcmf_sdio_chip *)&bcmf_43438_config_sdio;
+        break;
+#endif
+
+#ifdef CONFIG_IEEE80211_BROADCOM_BCM43455
+      case SDIO_DEVICE_ID_BROADCOM_43455:
+        wlinfo("bcm43455 chip detected\n");
+        sbus->chip = (struct bcmf_sdio_chip *)&bcmf_43455_config_sdio;
         break;
 #endif
 

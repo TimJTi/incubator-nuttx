@@ -66,10 +66,12 @@ extern const struct procfs_operations irq_operations;
 extern const struct procfs_operations cpuload_operations;
 extern const struct procfs_operations critmon_operations;
 extern const struct procfs_operations meminfo_operations;
+extern const struct procfs_operations memdump_operations;
 extern const struct procfs_operations iobinfo_operations;
 extern const struct procfs_operations module_operations;
 extern const struct procfs_operations uptime_operations;
 extern const struct procfs_operations version_operations;
+extern const struct procfs_operations tcbinfo_operations;
 
 /* This is not good.  These are implemented in other sub-systems.  Having to
  * deal with them here is not a good coupling. What is really needed is a
@@ -114,6 +116,9 @@ static const struct procfs_entry_s g_procfs_entries[] =
 
 #ifndef CONFIG_FS_PROCFS_EXCLUDE_MEMINFO
   { "meminfo",       &meminfo_operations,         PROCFS_FILE_TYPE   },
+#ifndef CONFIG_FS_PROCFS_EXCLUDE_MEMDUMP
+  { "memdump",       &memdump_operations,         PROCFS_FILE_TYPE   },
+#endif
 #endif
 
 #if defined(CONFIG_MM_IOB) && !defined(CONFIG_FS_PROCFS_EXCLUDE_IOBINFO)
@@ -164,6 +169,10 @@ static const struct procfs_entry_s g_procfs_entries[] =
 
 #if !defined(CONFIG_FS_PROCFS_EXCLUDE_VERSION)
   { "version",       &version_operations,         PROCFS_FILE_TYPE   },
+#endif
+
+#if defined(CONFIG_DEBUG_TCBINFO) && !defined(CONFIG_FS_PROCFS_EXCLUDE_TCBINFO)
+  { "tcbinfo",       &tcbinfo_operations,         PROCFS_FILE_TYPE   },
 #endif
 };
 
@@ -585,7 +594,8 @@ static int procfs_opendir(FAR struct inode *mountpt, FAR const char *relpath,
     }
   else
     {
-      int x, ret;
+      int x;
+      int ret;
       int len = strlen(relpath);
 
       /* Search the static array of procfs_entries */
@@ -794,8 +804,7 @@ static int procfs_readdir(struct inode *mountpt, struct fs_dirent_s *dir)
 
               level0->lastlen = strcspn(name, "/");
               level0->lastread = name;
-              strncpy(dir->fd_dir.d_name, name, level0->lastlen);
-              dir->fd_dir.d_name[level0->lastlen] = '\0';
+              strlcpy(dir->fd_dir.d_name, name, level0->lastlen + 1);
 
               /* If the entry is a directory type OR if the reported name is
                * only a sub-string of the entry (meaning that it contains

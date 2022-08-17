@@ -32,8 +32,8 @@
 #include <nuttx/init.h>
 #include <nuttx/arch.h>
 #include <nuttx/clock.h>
-#include <nuttx/streams.h>
-#include <nuttx/syslog/syslog.h>
+
+#include "syslog.h"
 
 /****************************************************************************
  * Private Data
@@ -105,17 +105,12 @@ int nx_vsyslog(int priority, FAR const IPTR char *fmt, FAR va_list *ap)
 
       clock_gettime(CLOCK_REALTIME, &ts);
 
-#elif defined(CONFIG_CLOCK_MONOTONIC)
+#else
       /* Prefer monotonic when enabled, as it can be synchronized to
        * RTC with clock_resynchronize.
        */
 
       clock_gettime(CLOCK_MONOTONIC, &ts);
-
-#else
-      /* Otherwise, fall back to the system timer */
-
-      clock_systime_timespec(&ts);
 #endif
 
       /* Prepend the message with the current time, if available */
@@ -200,7 +195,7 @@ int nx_vsyslog(int priority, FAR const IPTR char *fmt, FAR va_list *ap)
 #if defined(CONFIG_SYSLOG_PREFIX)
   /* Prepend the prefix, if available */
 
-  ret += lib_sprintf(&stream.public, "%s", CONFIG_SYSLOG_PREFIX_STRING);
+  ret += lib_sprintf(&stream.public, "[%s] ", CONFIG_SYSLOG_PREFIX_STRING);
 #endif
 
 #if CONFIG_TASK_NAME_SIZE > 0 && defined(CONFIG_SYSLOG_PROCESS_NAME)

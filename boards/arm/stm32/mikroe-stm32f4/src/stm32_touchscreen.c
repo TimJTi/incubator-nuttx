@@ -41,9 +41,7 @@
 #include <nuttx/semaphore.h>
 
 #include <arch/board/board.h>
-#include "arm_arch.h"
 #include "arm_internal.h"
-
 #include "stm32_adc.h"
 #include "stm32_gpio.h"
 #include "mikroe-stm32f4.h"
@@ -265,10 +263,13 @@ static const struct file_operations tc_fops =
   tc_open,    /* open */
   tc_close,   /* close */
   tc_read,    /* read */
-  0,          /* write */
-  0,          /* seek */
+  NULL,       /* write */
+  NULL,       /* seek */
   tc_ioctl,   /* ioctl */
   tc_poll     /* poll */
+#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+  , NULL      /* unlink */
+#endif
 };
 
 /* If only a single touchscreen device is supported, then the driver state

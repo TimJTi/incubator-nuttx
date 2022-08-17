@@ -34,9 +34,7 @@
 #include <arch/board/board.h>
 #include <arch/efm32/chip.h>
 
-#include "arm_arch.h"
 #include "arm_internal.h"
-
 #include "efm32_config.h"
 #include "efm32_lowputc.h"
 #include "efm32_clockconfig.h"
@@ -259,7 +257,7 @@ void __start(void)
    * segments.
    */
 
-#ifdef CONFIG_NUTTX_KERNEL
+#ifdef CONFIG_BUILD_PROTECTED
   efm32_userspace();
   showprogress('E');
 #endif

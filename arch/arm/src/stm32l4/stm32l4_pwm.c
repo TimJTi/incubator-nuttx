@@ -36,8 +36,6 @@
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
-#include "arm_arch.h"
-
 #include "chip.h"
 #include "stm32l4_pwm.h"
 #include "stm32l4.h"
@@ -3166,7 +3164,7 @@ static int pwm_timer(FAR struct pwm_lowerhalf_s *dev,
   DEBUGASSERT(priv != NULL && info != NULL);
 
 #if defined(CONFIG_STM32L4_PWM_MULTICHAN)
-  pwminfo("TIM%u frequency: %u\n",
+  pwminfo("TIM%u frequency: %" PRIu32 "\n",
           priv->timid, info->frequency);
 #else
   pwminfo("TIM%u channel: %u frequency: %" PRIu32 " duty: %08" PRIx32 "\n",
