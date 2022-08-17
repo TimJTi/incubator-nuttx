@@ -51,6 +51,7 @@
 #include <errno.h>
 #include <queue.h>
 #include <debug.h>
+#include <assert.h>
 
 #include <nuttx/kmalloc.h>
 #include <nuttx/mqueue.h>

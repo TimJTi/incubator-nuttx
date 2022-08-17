@@ -38,6 +38,7 @@
 #include <string.h>
 #include <errno.h>
 #include <debug.h>
+#include <assert.h>
 
 #include <arch/board/board.h>
 #include <nuttx/irq.h>

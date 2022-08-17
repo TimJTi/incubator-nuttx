@@ -216,8 +216,9 @@
 #define M25P_PP        0x02  /* 1 Page Program              3   0     1-256 */
 #define M25P_SE        0xd8  /* 1 Sector Erase              3   0     0     */
 #define M25P_BE        0xc7  /* 1 Bulk Erase                0   0     0     */
+#define M25Q_DE        0xc4  /* 1 Die Erase                 0   0     0     */
 #define M25P_DP        0xb9  /* 2 Deep power down           0   0     0     */
-#define M25P_RES       0xab  /* 2 Read Electronic Signature 0   3     >=1   */
+#define M25P_RES       0xab  /* 2 Release from deep sleep   0   3     >=1   */
 #define M25P_SSE       0x20  /* 3 Sub-Sector Erase          0   0     0     */
 
 /* NOTE 1: All parts.
@@ -262,6 +263,9 @@ struct m25p_dev_s
   uint8_t  pageshift;        /* 8 */
   uint16_t nsectors;         /* 128 or 64 */
   uint32_t npages;           /* 32,768 or 65,536 */
+  uint16_t manufacturer;     /* detected manufacturer */
+  uint16_t memory;           /* detected memory type */
+  uint16_t capacity;         /* detected capacity */
 #ifdef CONFIG_M25P_SUBSECTOR_ERASE
   uint8_t  subsectorshift;   /* 0, 12 or 13 (4K or 8K) */
 #endif
@@ -314,10 +318,6 @@ static int m25p_ioctl(FAR struct mtd_dev_s *dev,
 
 /****************************************************************************
  * Private Data
- ****************************************************************************/
-
-/****************************************************************************
- * Private Functions
  ****************************************************************************/
 
 /****************************************************************************
@@ -387,6 +387,12 @@ static inline int m25p_readid(struct m25p_dev_s *priv)
 
   SPI_SELECT(priv->dev, SPIDEV_FLASH(0), false);
   m25p_unlock(priv->dev);
+
+  /* save the manufacturer and memory type */
+  
+  priv->manufacturer = manufacturer;
+  priv->memory = memory;
+  priv->capacity = capacity;
 
   finfo("manufacturer: %02x memory: %02x capacity: %02x\n",
         manufacturer, memory, capacity);
@@ -675,9 +681,70 @@ static inline int m25p_bulkerase(struct m25p_dev_s *priv)
 
   SPI_SELECT(priv->dev, SPIDEV_FLASH(0), true);
 
-  /* Send the "Bulk Erase (BE)" instruction */
+  /* Send the "Bulk Erase (BE)" instruction or "Die Erase" as appropriate.
+    Die erase needed for 1Gbit MT25Q/QU only */
 
-  SPI_SEND(priv->dev, M25P_BE);
+  if (priv->manufacturer == M25P_MANUFACTURER   &&
+          (priv->memory == MT25Q_MEMORY_TYPE || 
+           priv->memory == MT25QU_MEMORY_TYPE) &&
+           priv->capacity == M25P_MT25Q1G_CAPACITY)
+    {
+      /* erase die 0 */
+      SPI_SEND(priv->dev, M25Q_DE);
+      SPI_SEND(priv->dev, 0);
+      SPI_SEND(priv->dev, 0);
+      SPI_SEND(priv->dev, 0);
+      m25p_waitwritecomplete(priv);
+
+      /* erase die 0 */
+      SPI_SEND(priv->dev, M25Q_DE);
+      SPI_SEND(priv->dev, 0);
+      SPI_SEND(priv->dev, 0);
+      SPI_SEND(priv->dev, 1);
+#if 0
+      /* just for testing new support for MT25Q1G */      
+      m25p_waitwritecomplete(priv);
+      finfo("MT25Q1G die erase completed");
+      /* read all pages and check erase */
+      uint32_t offset;
+      char buffer[256];
+      const char erased[256] = {0xFF};
+      bool failed;
+      
+      failed = false;
+      for (offset=0; offset < 524288; offset++)
+        {
+          /* Send "Read from Memory" instruction */
+
+          SPI_SEND(priv->dev, M25P_READ);
+
+          /* Send the page offset high byte first. */
+
+          SPI_SEND(priv->dev, (offset >> 16) & 0xff);
+          SPI_SEND(priv->dev, (offset >> 8) & 0xff);
+          SPI_SEND(priv->dev, offset & 0xff);
+
+          /* Then read all of the requested bytes */
+
+          SPI_RECVBLOCK(priv->dev, &buffer, 256);
+          if (!memcmp(erased, buffer, 256))
+            {
+              finfo("die erase check failed at page %ld\n", offset);
+              failed = true;
+            }
+        }
+      if (!failed)
+      {
+        finfo("die erase check passed\n");
+      }
+#endif        
+    }
+  
+  else
+    {
+      SPI_SEND(priv->dev, M25P_BE);
+    }
+
 
   /* Deselect the FLASH */
 

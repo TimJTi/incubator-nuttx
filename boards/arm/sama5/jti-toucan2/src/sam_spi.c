@@ -66,7 +66,7 @@ void sam_spidev_initialize(void)
   sam_configpio(PIO_AT25_NPCS0);
 #endif
 
-#if defined(CONFIG_HAVE_M25P)
+#if defined(HAVE_M25P)
 sam_configpio(PIO_M25P_NPCS1);
 #endif
 

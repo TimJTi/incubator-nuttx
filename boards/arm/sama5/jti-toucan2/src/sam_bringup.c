@@ -296,9 +296,10 @@ else
 #endif
 #endif
 
-#if 0
+#if 1
 #if defined(CONFIG_MTD_M25P) && defined(CONFIG_SAMA5_SPI0)
 FAR struct spi_dev_s *spi_m25p;
+FAR struct mtd_dev_s *mtd_m25p1;
 FAR struct mtd_dev_s *mtd_m25p;
 spi_m25p = sam_spibus_initialize(M25P_PORT);
 if (!spi_m25p)
@@ -308,28 +309,30 @@ if (!spi_m25p)
 else
   {
     syslog(LOG_INFO, "Successfully initialized M25P SPI\n");
-  /* Now bind the SPI interface to the MT25QL256 SPI FLASH driver */
+    /* Now bind the SPI interface to the MT25QL256 SPI FLASH driver */
 
-  mtd_m25p = m25p_initialize(spi_m25p);
-
-  if (!mtd_m25p)
-    {
-      syslog(LOG_ERR,
+    mtd_m25p1 = m25p_initialize(spi_m25p);
+    if (!mtd_m25p1)
+      {
+        syslog(LOG_ERR,
             "ERROR: Failed to bind SPI0 CS1 to the SPI FLASH driver\n");
-    }
-  else
-   {
-      syslog(LOG_INFO, "Successfully bound SPI0 CS1 to the SPI"
+      }
+    else
+      {
+        syslog(LOG_INFO, "Successfully bound SPI0 CS1 to the SPI"
                       " FLASH driver\n");
-      if (ret < 0)
-        {
-          syslog(LOG_ERR, "Failed to initialise the FTL layer: %d\n", ret);
-        }
+        mtd_m25p = s512_initialize(mtd_m25p1);
+        if (!mtd_m25p)
+          {
+            syslog(LOG_ERR,
+              "ERROR: Failed to implement 512 byte sector conversion\n");
+          }
         else
           {
-            //syslog(LOG_INFO, "FTL layer successfully initialised\n");    
+            syslog(LOG_INFO, "Successfully implemented 512 byte sector"
+                      " conversion\n");            
             //ret = smart_initialize(M25P_MINOR, mtd_m25p, NULL);
-            ret = ftl_initialize(0, mtd_m25p);
+            ret = ftl_initialize(M25P_MINOR, mtd_m25p);
             if (ret < 0)
               {
                 syslog(LOG_ERR, "Failed to initialise the ftl layer %d\n", ret);
@@ -337,6 +340,7 @@ else
             else
               {
                 syslog(LOG_INFO, "Successfully initialised ftl layer\n");
+#if 0                
                 syslog(LOG_INFO, "initializing  file system...be patient\n");
                 ret = nxffs_initialize(mtd_m25p);
 
@@ -349,9 +353,9 @@ else
                 else      
                   {
                     syslog(LOG_INFO, "Successfully initialised file system\n");
-                
+                  
                     //ret = nx_mount("/dev/smart0", "/mnt", "smartfs",0, NULL);
-                    
+                      
                     ret = nx_mount(NULL, "/mnt/flash", "nxffs",0, NULL);
                     
                     if (ret < 0)
@@ -361,10 +365,10 @@ else
                     else      
                       {
                         syslog(LOG_INFO, "Successfully mounted the file system\n");
-
                       }
                   }
-              }
+#endif 
+              }     
           }
       }
   }
