@@ -45,7 +45,7 @@
 
 
 
-#if defined(HAVE_FUSB302) && defined (CONFIG_DEBUG_FUSB302)
+#if defined(HAVE_FUSB302) && defined (CONFIG_FUSB302)
 
 /****************************************************************************
  * Pre-processor Definitions
