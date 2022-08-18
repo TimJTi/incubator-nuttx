@@ -45,7 +45,7 @@
 
 
 
-#if defined(HAVE_FUSB302) && defined (CONFIG_FUSB302)
+#if defined (CONFIG_FUSB302)
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -170,7 +170,7 @@ static void fusb302_irq_enable(FAR struct fusb302_config_s *state, bool enable)
   leave_critical_section(flags);
 }
 
-/* Do not believce we need to do anything to clear the interrupt
+/* Do not believe we need to do anything to clear the interrupt
 /****************************************************************************
  * Name: fusb302_irq_clear
  *

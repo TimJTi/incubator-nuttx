@@ -90,9 +90,9 @@
 # include <nuttx/sensors/max31855.h>
 #endif
 
-#if defined (HAVE_FUSB302) && !defined (CONFIG_SAMA5_TWI0)
-#undef HAVE_FUSB302
-#warning HAVE_FUSB302 has been undefined as CONFIG_SAMA5_TWI0 not defined
+#if defined (CONFIG_FUSB302) && !defined (CONFIG_SAMA5_TWI0)
+#undef CONFIG_FUSB302
+#warning CONFIG_FUSB302 has been undefined as CONFIG_SAMA5_TWI0 not defined
 #else
 # include <nuttx/usb/fusb302.h>
 #endif
@@ -375,7 +375,7 @@ else
 #endif
 #endif
 
-#ifdef HAVE_FUSB302
+#ifdef CONFIG_FUSB302
   //ret = sam_fusb302init(g_i2c0_dev, FUSB302_I2C_ADDR);
   ret = sam_fusb302init(0);
   if (ret < 0)
