@@ -1074,7 +1074,7 @@ config SAMA5D2_CLASSD_DEEMP
   default n
   
 config SAMA5D2_CLASSD_SWAP
-  bool "Swap Left and Right Channels (SWAP)
+  bool "Swap Left and Right Channels (SWAP)"
   default n
   
 config SAMA5D2_CLASSD_FRAME
