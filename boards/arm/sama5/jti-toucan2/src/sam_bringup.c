@@ -36,7 +36,7 @@
 #include <nuttx/usb/usbdev.h>
 #include <nuttx/usb/usbhost.h>
 #include <nuttx/usb/usbdev_trace.h>
-#include "arm_arch.h"
+#include "arm_internal.h"
 #include "hardware/sam_sfr.h"
 #include <nuttx/spi/spi.h>
 #include "jti-toucan2.h"

@@ -45,7 +45,6 @@
 #include <nuttx/spi/spi.h>
 
 #include "arm_internal.h"
-#include "arm_arch.h"
 
 #include "chip.h"
 #include "sam_pio.h"

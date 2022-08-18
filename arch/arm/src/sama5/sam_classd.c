@@ -35,7 +35,7 @@
 
 #include "chip.h"
 */
-#include "arm_arch.h"
+#include "arm_internal.h"
 #include <nuttx/config.h>
 
 #include <sys/types.h>

@@ -38,7 +38,7 @@
 //#include <nuttx/kthread.h>
 
 
-#include "arm_arch.h"
+#include "arm_internal.h"
 #include "sam_pio.h"
 #include "sam_usbhost.h"
 
