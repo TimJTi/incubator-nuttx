@@ -59,7 +59,10 @@
 enum fusb_state_e
 {
   WAITING_FOR_TOGGLE_I    = 0,
-  NOT_DEFINED,
+  WAITING_FOR_DISCONNECT,
+  WAITING_FOR_EVENT_WHILE_SRC_CONNECTED,
+  WAITING_FOR_EVENT_WHILE_SNK_CONNECTED,
+  STATE_NOT_DEFINED,
 
 };
 
@@ -125,6 +128,8 @@ static int fusb302_schedule(FAR struct fusb302_dev_s *priv);
 void enableccpd(FAR struct fusb302_dev_s *priv,   enum cc_pd_e pulldown, bool enable);
 void enableccpu(FAR struct fusb302_dev_s *priv,   enum cc_pu_e pullup,   bool enable);
 void enablevconn(FAR struct fusb302_dev_s *priv, enum cc_vconn_e vconn,  bool enable);
+static int fusb302_starttoggle(FAR struct fusb302_dev_s *priv);
+static uint8_t  detected_status;
 
 /****************************************************************************
  * Private Data
@@ -144,7 +149,7 @@ static const struct file_operations g_fusb302ops =
 #endif
 };
 
-static enum fusb_state_e fusb_state;
+static enum fusb_state_e fusb302_state;
 
 /****************************************************************************
  * Private Functions
@@ -250,6 +255,7 @@ void enablevconn(FAR struct fusb302_dev_s *priv, enum cc_vconn_e vconn,  bool en
 }
 
 
+
 /****************************************************************************
  * Name: fusb302_worker
  *
@@ -269,7 +275,9 @@ static void fusb302_worker(FAR void *arg)
   FAR struct fusb302_config_s *config;
   int                         ret;
   int                         regval;
-  int                         toggsval;
+  int                         toggdone_result;
+  int                         intareg;
+  int                         intreg;
 
   DEBUGASSERT(priv != NULL);
   
@@ -296,60 +304,114 @@ static void fusb302_worker(FAR void *arg)
   else
     {
       fusb302_info("INFO: state machine time!\n");
-
+      intareg = fusb302_getreg(priv, FUSB302_INTERRUPTA_REG);
+      intreg = fusb302_getreg(priv, FUSB302_INTERRUPT_REG);
+      fusb302_info("INFO: int reg =%x\n", intreg);
+      fusb302_info("INFO: inta reg =%x\n", intareg);
       /* do statemachine */
-      switch (fusb_state)
+      switch (fusb302_state)
       {
         case WAITING_FOR_TOGGLE_I:
           {
-            if (fusb302_getreg(priv, FUSB302_INTERRUPTA_REG) 
-                                    & INTERRUPTA_M_TOGDONE)
+            if (intareg & INTERRUPTA_M_TOGDONE)
             {
-              toggsval = DECODE_TOGGS(fusb302_getreg(priv, 
+              toggdone_result = DECODE_TOGGS(fusb302_getreg(priv, 
                                       FUSB302_STATUS1A_REG));
-              fusb302_info("INFO: toggs val=%x\n", toggsval);
-              switch (toggsval)
+              
+              switch (toggdone_result)
               /* what device detect type was seen */
+              
               {
                 case TOGGS_SRC_CC1:
-                  enableccpd(priv,  CC1_PULLDOWN, false);                
-                  enableccpd(priv,  CC2_PULLDOWN, false);                
-                  enableccpu(priv,  CC1_PULLUP, true);
-                  enableccpu(priv,  CC2_PULLUP, false);
-                  enablevconn(priv, CC1_VCONN, true);
-                  enablevconn(priv, CC2_VCONN, false);
-                break;
                 case TOGGS_SRC_CC2:
-                  enableccpd(priv,  CC1_PULLDOWN, false);                
-                  enableccpd(priv,  CC2_PULLDOWN, false);                
-                  enableccpu(priv,  CC1_PULLUP, false);
-                  enableccpu(priv,  CC2_PULLUP, true);  
-                  enablevconn(priv, CC1_VCONN, false);               
-                  enablevconn(priv, CC2_VCONN, true);                                       
+                  fusb302_info("INFO: auto-detected SRC mode\n");
+                  /* handle togdone src */
+
+                  /* set interrupts to look for relevant changes/notifications 
+                     which is only a detach (COMP=1) for now*/
+
+                  ret = fusb302_putreg(priv, FUSB302_MASK_REG,
+                                      ( MASK_VBUS_OK    |
+                                        MASK_ACTIVITY   |
+                                        //MASK_COMP_CHNG    |
+                                        MASK_CRC_CHK    |
+                                        MASK_ALERT      |
+                                        MASK_WAKE       |
+                                        MASK_COLLISION  |
+                                        MASK_BC_LVL
+                                      )); 
+                  ret = fusb302_putreg(priv, FUSB302_MASKA_REG,
+                                      ( MASKA_TOGDONE   |
+                                        MASKA_OCP_TEMP  |
+                                        MASKA_SOFTFAIL  |
+                                        MASKA_RETRYFAIL |
+                                        MASKA_HARDSENT  |
+                                        MASKA_TXSENT    |
+                                        MASKA_SOFTRST   |
+                                        MASKA_HARDRST 
+                                      ));
+                  ret = fusb302_putreg(priv, FUSB302_MASKB_REG, MASKB_GCRCSENT);
+                  if (ret<0)
+                  {
+                    fusb302_err("ERROR: unable to set mask registers after SRC detect\n");
+                  }
+                  detected_status = SRC_DEVICE_CONNECTED;
+                  fusb302_notify(priv);
+                  fusb302_state = WAITING_FOR_EVENT_WHILE_SRC_CONNECTED;
+
                 break;
                 case TOGGS_SNK_CC1:
-                  enablevconn(priv, CC1_VCONN, false);                  
-                  enablevconn(priv, CC2_VCONN, false);
-                  enableccpu(priv, CC1_PULLUP, false); 
-                  enableccpd(priv, CC2_PULLUP, false);                
-                  enableccpd(priv, CC1_PULLDOWN, true);
-                  enableccpd(priv, CC2_PULLDOWN, false);
-                break;
                 case TOGGS_SNK_CC2:
-                  enablevconn(priv, CC1_VCONN, false);                  
-                  enablevconn(priv, CC2_VCONN, false);                
-                  enableccpu(priv, CC1_PULLUP, false); 
-                  enableccpu(priv, CC2_PULLUP, false);                
-                  enableccpd(priv, CC2_PULLDOWN, true);
-                  enableccpd(priv, CC1_PULLDOWN, false);
+                  fusb302_info("INFO: auto-detected SNK mode\n");
+                  /* handle toggs done snk */
+                  /* set interrupts to look for relevant changes/notifications 
+                     which is only a detach (VBUS=1) for now*/
+
+                  ret = fusb302_putreg(priv, FUSB302_MASK_REG,
+                                      ( //MASK_VBUS_OK    |
+                                        MASK_ACTIVITY   |
+                                        MASK_COMP_CHNG    |
+                                        MASK_CRC_CHK    |
+                                        MASK_ALERT      |
+                                        MASK_WAKE       |
+                                        MASK_COLLISION  |
+                                        MASK_BC_LVL
+                                      )); 
+                  ret = fusb302_putreg(priv, FUSB302_MASKA_REG,
+                                      ( MASKA_TOGDONE   |
+                                        MASKA_OCP_TEMP  |
+                                        MASKA_SOFTFAIL  |
+                                        MASKA_RETRYFAIL |
+                                        MASKA_HARDSENT  |
+                                        MASKA_TXSENT    |
+                                        MASKA_SOFTRST   |
+                                        MASKA_HARDRST 
+                                      ));
+                  ret = fusb302_putreg(priv, FUSB302_MASKB_REG, MASKB_GCRCSENT);
+                  if (ret<0)
+                  {
+                    fusb302_err("ERROR: unable to set mask registers after SRC detect\n");
+                  }                  
+                  detected_status = SNK_DEVICE_CONNECTED;
+                  fusb302_notify(priv);
+                  fusb302_state = WAITING_FOR_EVENT_WHILE_SNK_CONNECTED;
+                  
                 break;
                 case TOGGS_AUDIO_ACCCESSORY:
+                  fusb302_info("INFO: auto-detected Audio Acc mode (not supported)\n");
+
+                  fusb302_state = STATE_NOT_DEFINED;
+                /* handle audio accessory - not supported? */
                 break;
                 default:
-                  fusb302_err("ERROR: invalid TOGGS VAL read:%x\n");
+                  fusb302_err("ERROR: invalid TOGGLE mode result value read:%x\n", toggdone_result);
+
+                  fusb302_state = STATE_NOT_DEFINED;
                   goto error_exit;
                 break;
-                //fusb_state = NOT_DEFINED;
+                
+                
+                
               }
               fusb302_dump_registers(priv, "After toggle detect");
               /*  Next:
@@ -359,16 +421,53 @@ static void fusb302_worker(FAR void *arg)
                     4) revert to toggle if so
               */
             }
+            else
+            {
+              fusb302_info("INFO: not a toggle interrupt in inta\n");
+              fusb302_dump_registers(priv, "After a non-tog interrupta");
+            }
           }
         break;
+        case WAITING_FOR_EVENT_WHILE_SRC_CONNECTED:
+          regval = fusb302_getreg(priv, FUSB302_STATUS0_REG);
+          if (intreg & INTERRUPT_COMP_CHNG)
+          {
+            fusb302_info("INFO: Comparator level change detected - COMP bit= %u\n", (regval & STATUS0_COMP)>>5);
+          }
+          else
+          {
+            fusb302_err("ERROR: masked interrupt received!!\n");
+          }
+          detected_status = SRC_DEVICE_DISCONNECTED;
+          fusb302_notify(priv);
+          fusb302_starttoggle(priv);
+          fusb302_state = WAITING_FOR_TOGGLE_I;
+        break;
+        case WAITING_FOR_EVENT_WHILE_SNK_CONNECTED:
+          regval = fusb302_getreg(priv, FUSB302_STATUS0_REG);
+           if (intreg & INTERRUPT_VBUS_OK)
+          {
+            fusb302_info("INFO: VBUS level change detected - VBUS bit= %u\n", (regval & STATUS0_VBUS_OK)>>7);
+          }
+          else
+          {
+            fusb302_err("ERROR: masked interrupt received!!\n");
+          }
+          detected_status = SNK_DEVICE_DISCONNECTED;
+          fusb302_notify(priv);
+          /* restart toggle detection */
+          fusb302_starttoggle(priv);
+          fusb302_state = WAITING_FOR_TOGGLE_I;
+
+        break;       
         default:
           {
-            fusb302_info("state not defined yet\n");
+            fusb302_info("state machine state not coded yet\n");
             fusb302_reset(priv);
           }
+        break;
       }
-     /* notify any waiters that there's a new state */
-      fusb302_notify(priv);
+
     }
 error_exit:    
   /* renable interrupt */
@@ -709,6 +808,70 @@ err_out:
 }
 
 /****************************************************************************
+ * Name: fusb302_starttoggle
+ *
+ * Description:
+ *   Configure FUSB302 to start auto toggle detection
+ *
+ ****************************************************************************/
+static int fusb302_starttoggle(FAR struct fusb302_dev_s *priv)
+{
+
+  int ret;
+  int regval;
+
+  priv->int_pending = false;      
+  priv->config->irq_enable(priv->config, false);
+  fusb302_reset(priv);
+  //ret = fusb302_putreg(priv, FUSB302_SWITCHES0_REG, 0);
+  ret = fusb302_putreg(priv, FUSB302_CONTROL2_REG, 
+                              (SET_POLL_MODE(DRP_POLLING) | CONTROL2_TOGGLE));
+  ret = fusb302_putreg(priv, FUSB302_POWER_REG, 
+                              POWER_MODE(POWER_MODE_BANDGAP_AND_WAKE |
+                                        POWER_MODE_RX_AND_IREF |
+                                        POWER_MODE_MEASURE_BLOCK));
+  /* mask all interrupts except TOGDONE */
+  ret = fusb302_putreg(priv, FUSB302_MASK_REG, 
+                              (MASK_VBUS_OK       |
+                              MASK_ACTIVITY   |
+                              MASK_COMP_CHNG  |
+                              MASK_CRC_CHK    |
+                              MASK_ALERT      |
+                              MASK_WAKE       |
+                              MASK_COLLISION));
+  ret = fusb302_putreg(priv, FUSB302_MASKA_REG, 
+                              (MASKA_OCP_TEMP  |
+                              MASKA_SOFTFAIL  |
+                              MASKA_RETRYFAIL |
+                              MASKA_HARDSENT  |
+                              MASKA_TXSENT    |
+                              MASKA_SOFTRST   |
+                              MASKA_HARDRST ));
+  ret = fusb302_putreg(priv, FUSB302_MASKB_REG, MASKB_GCRCSENT);
+  regval = fusb302_getreg(priv, FUSB302_CONTROL0_REG );
+  regval &= ~CONTROL0_HOST_CUR_MASK;
+  regval |= HOST_CURRENT(HOST_CURRENT_80UA);
+  regval &= ~CONTROL0_INT_MASK;
+  /* enable interrupts */
+  ret = fusb302_putreg(priv, FUSB302_CONTROL0_REG, regval);
+  
+  detected_status = NOTHING_CONNECTED;
+  fusb302_notify(priv);
+  if (ret == OK)
+    {
+      ret = fusb302_putreg(priv, FUSB302_POWER_REG, POWER_MODE(POWER_MODE_ALL));
+
+      priv->config->irq_enable(priv->config, true);
+      fusb302_state = WAITING_FOR_TOGGLE_I;
+    }
+  else
+    {
+      priv->config->irq_enable(priv->config, false);
+    }
+  return ret;
+}
+
+/****************************************************************************
  * Name: fusb302_set_mode
  *
  * Description:
@@ -720,8 +883,6 @@ static int fusb302_set_mode(FAR struct fusb302_dev_s *priv,
                             enum fusb302_mode_e mode)
 {
   int ret;
-  int regval;
-
   ret = OK;
 
   switch (mode)
@@ -743,56 +904,15 @@ static int fusb302_set_mode(FAR struct fusb302_dev_s *priv,
 
     break;
     case MODE_DRP_POLL_AUTO:
-      
-      priv->int_pending = false;      
-      priv->config->irq_enable(priv->config, false);
-      fusb302_reset(priv);
-      //ret = fusb302_putreg(priv, FUSB302_SWITCHES0_REG, 0);
-      ret = fusb302_putreg(priv, FUSB302_CONTROL2_REG, 
-                                 (SET_POLL_MODE(DRP_POLLING) | CONTROL2_TOGGLE));
-      ret = fusb302_putreg(priv, FUSB302_POWER_REG, 
-                                 POWER_MODE(POWER_MODE_BANDGAP_AND_WAKE |
-                                            POWER_MODE_RX_AND_IREF |
-                                            POWER_MODE_MEASURE_BLOCK));
-      ret = fusb302_putreg(priv, FUSB302_MASK_REG, 
-                                 (MASK_VBUS_OK       |
-                                  MASK_ACTIVITY   |
-                                  MASK_COMP_CHNG  |
-                                  MASK_CRC_CHK    |
-                                  MASK_ALERT      |
-                                  MASK_WAKE       |
-                                  MASK_COLLISION));
-      ret = fusb302_putreg(priv, FUSB302_MASKA_REG, 
-                                 (MASKA_OCP_TEMP  |
-                                  MASKA_SOFTFAIL  |
-                                  MASKA_RETRYFAIL |
-                                  MASKA_HARDSENT  |
-                                  MASKA_TXSENT    |
-                                  MASKA_SOFTRST   |
-                                  MASKA_HARDRST ));
-      ret = fusb302_putreg(priv, FUSB302_MASKB_REG, MASKB_GCRCSENT);
-      regval = fusb302_getreg(priv, FUSB302_CONTROL0_REG );
-      regval &= ~CONTROL0_INT_MASK;
-      /* enable interrupts */
-      ret = fusb302_putreg(priv, FUSB302_CONTROL0_REG, regval);
-      if (ret == OK)
-        {
-          //ret = fusb302_putreg(priv, FUSB302_POWER_REG, POWER_MODE(POWER_MODE_ALL));
+      fusb302_starttoggle(priv);
 
-          priv->config->irq_enable(priv->config, true);
-          fusb_state = WAITING_FOR_TOGGLE_I;
-        }
-      else
-        {
-          priv->config->irq_enable(priv->config, false);
-        }
 
     break;
     default:
       return -EINVAL;
     break;
   }
-
+  fusb302_dump_registers(priv, "Registers after mode set");
   return ret;
 
 }
@@ -988,9 +1108,9 @@ static ssize_t fusb302_read(FAR struct file *filep,
     }
 
   flags = enter_critical_section();
+  ptr->usbc_connection_status = detected_status;
 
-
-
+/*
   ptr->status0 = fusb302_getreg(priv, FUSB302_STATUS0_REG);
   ptr->status1 = fusb302_getreg(priv, FUSB302_STATUS1_REG);
   ptr->status0a = fusb302_getreg(priv, FUSB302_STATUS0A_REG);
@@ -1004,7 +1124,7 @@ static ssize_t fusb302_read(FAR struct file *filep,
   }
   
   priv->int_pending = false;
-
+*/
   leave_critical_section(flags);
 
   nxsem_post(&priv->devsem);
@@ -1239,6 +1359,7 @@ static int fusb302_int_handler(int irq, FAR void *context, FAR void *arg)
   FAR struct fusb302_config_s *config;
   //irqstate_t                  flags;
   int                         ret;
+
   
   ret = OK;
   DEBUGASSERT(priv != NULL);

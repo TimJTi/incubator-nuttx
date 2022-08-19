@@ -277,8 +277,8 @@ extern "C"
 #define STATUS1A_RXSOP2               (1 << 7)
 
 /* Interrupt - 0x42 */
-#define INTERRUPT_BC_LVL_MASK         (1 << 0)
-#define INTERRUPT_COLLISION_          (1 << 1)
+#define INTERRUPT_BC_LVL              (1 << 0)
+#define INTERRUPT_COLLISION           (1 << 1)
 #define INTERRUPT_WAKE                (1 << 2)
 #define INTERRUPT_ALERT               (1 << 3)
 #define INTERRUPT_CRC_OK              (1 << 4)
@@ -329,6 +329,14 @@ enum fusb302_reg_address_e
   FUSB302_STATUS1_REG,
   FUSB302_INTERRUPT_REG,
   FUSB302_FIFOS_REG,
+};
+enum fusb302_connection_status
+{
+  NOTHING_CONNECTED = 0,
+  SRC_DEVICE_CONNECTED,
+  SRC_DEVICE_DISCONNECTED,
+  SNK_DEVICE_CONNECTED,
+  SNK_DEVICE_DISCONNECTED,
 };
 #if 0
 /* Device ID - 0x01 */
@@ -564,6 +572,7 @@ enum fusb302_fifos_e
   FIFOS_TX_RX_TOKEN           = (1 << 0),
 };
 #endif
+/*
 struct fusb302_result_s
 {
   uint8_t status0;
@@ -573,6 +582,10 @@ struct fusb302_result_s
   uint8_t interrupt;
   uint8_t dev_type;
   bool int_pending;
+};*/
+struct fusb302_result_s
+{
+  enum fusb302_connection_status usbc_connection_status;
 };
 
 struct fusb302_setup_s
