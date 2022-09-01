@@ -58,26 +58,59 @@
 
 #define LP503X_BANK_BRIGHTNESS  0x04
 
-#define LP503X_BANK_A_COLOUR	  0x05 /* All red LEDs */
-#define LP503X_BANK_B_COLOUR	  0x06 /* All greem LEDs */
-#define LP503X_BANK_C_COLOUR	  0x07 /* All Blue LEDs */
+#define LP503X_BANK_A_COLOUR	  0x05 /* All red   LEDs */
+#define LP503X_BANK_B_COLOUR	  0x06 /* All green LEDs */
+#define LP503X_BANK_C_COLOUR	  0x07 /* All blue  LEDs */
 
-#define LP503X_LED0_BRIGHTNESS	0x08 /* 12 RGB LEDs, registers incremental */
+#define LP503X_LED0_BRIGHTNESS	0x08
+#define LP503X_LED1_BRIGHTNESS	0x09
+#define LP503X_LED2_BRIGHTNESS	0x0A
+#define LP503X_LED3_BRIGHTNESS	0x0B
+#define LP503X_LED4_BRIGHTNESS	0x0C
+#define LP503X_LED5_BRIGHTNESS	0x0D
+#define LP503X_LED6_BRIGHTNESS	0x0E
+#define LP503X_LED7_BRIGHTNESS	0x0F
+#define LP503X_LED8_BRIGHTNESS	0x10
+#define LP503X_LED9_BRIGHTNESS	0x11
+#define LP503X_LED10_BRIGHTNESS	0x12
+#define LP503X_LED11_BRIGHTNESS	0x13
 
-#define LP503X_OUT0_COLOUR    	0x14 /* 36 LEDs, registers incremental */
-
-#define LP503X_LED0_COLOUR		  0x14 /* 36 Outputs, registers increment */
-#define LP503X_LED1_COLOUR		  0x17
-#define LP503X_LED2_COLOUR		  0x1A
-#define LP503X_LED3_COLOUR		  0x1D
-#define LP503X_LED4_COLOUR		  0x20
-#define LP503X_LED5_COLOUR		  0x23
-#define LP503X_LED6_COLOUR		  0x26
-#define LP503X_LED7_COLOUR		  0x29
-#define LP503X_LED8_COLOUR		  0x2C
-#define LP503X_LED9_COLOUR		  0x2F
-#define LP503X_LED10_COLOUR		  0x32
-#define LP503X_LED11_COLOUR		  0x35
+#define LP503X_OUT0_COLOUR    	0x14
+#define LP503X_OUT1_COLOUR    	0x15
+#define LP503X_OUT2_COLOUR    	0x16
+#define LP503X_OUT3_COLOUR    	0x17
+#define LP503X_OUT4_COLOUR    	0x18
+#define LP503X_OUT5_COLOUR    	0x19
+#define LP503X_OUT6_COLOUR    	0x1A
+#define LP503X_OUT7_COLOUR    	0x1B
+#define LP503X_OUT8_COLOUR    	0x1C
+#define LP503X_OUT9_COLOUR    	0x1D
+#define LP503X_OUT10_COLOUR    	0x1E
+#define LP503X_OUT11_COLOUR    	0x1F
+#define LP503X_OUT12_COLOUR    	0x20
+#define LP503X_OUT13_COLOUR    	0x21
+#define LP503X_OUT14_COLOUR    	0x22
+#define LP503X_OUT15_COLOUR    	0x23
+#define LP503X_OUT16_COLOUR    	0x24
+#define LP503X_OUT17_COLOUR    	0x25
+#define LP503X_OUT18_COLOUR    	0x26
+#define LP503X_OUT19_COLOUR    	0x27
+#define LP503X_OUT20_COLOUR    	0x28
+#define LP503X_OUT21_COLOUR    	0x29
+#define LP503X_OUT22_COLOUR    	0x2A
+#define LP503X_OUT23_COLOUR    	0x2B
+#define LP503X_OUT24_COLOUR    	0x2C
+#define LP503X_OUT25_COLOUR    	0x2D
+#define LP503X_OUT26_COLOUR    	0x2E
+#define LP503X_OUT27_COLOUR    	0x2F
+#define LP503X_OUT28_COLOUR    	0x30
+#define LP503X_OUT29_COLOUR    	0x31
+#define LP503X_OUT30_COLOUR    	0x32
+#define LP503X_OUT31_COLOUR    	0x33
+#define LP503X_OUT32_COLOUR    	0x34
+#define LP503X_OUT33_COLOUR    	0x35
+#define LP503X_OUT34_COLOUR    	0x36
+#define LP503X_OUT35_COLOUR    	0x37
 
 #define LP503X_RESET			      0x38
 
@@ -141,9 +174,9 @@
 #define PWMIOC_ENABLE               _PWMIOC(0) /* true/false                 */
 #define PWMIOC_RESET                _PWMIOC(1) /* no args                    */
 #define PWMIOC_CONFIG               _PWMIOC(2) /* lin/log
-                                                  pwm dither
-                                                  Imax
-                                                  Power Save                 */
+                                                * pwm dither
+                                                * Imax
+                                                * Power Save                 */
 #define PWMIOC_ENABLE_LED_BANK_MODE _PWMIOC(3) /* led(0..11)                 */
 #define PWMIOC_SET_LED_COLOUR       _PWMIOC(4) /* led(0..35), Colour(0..255) */
 #define PWMIOC_SET_RGB_COLOUR       _PWMIOC(5) /* led(0..11), Colour HTML RGB*/
@@ -155,15 +188,16 @@
  * Public Types
  ****************************************************************************/
 
-/* struct use to set device operating modes 
+/* struct use to set device operating modes
  * - log/lin scale
  * - power save enable/disable
  * - reg auto inc mode (set to FALSE (disable) for this driver
  * - pwm dithering enable/disable
  * - max current option
  * - global LED shutdown control
- 
+
  */
+
 struct lp503x_config_s
 {
   bool enable_log_mode;
@@ -176,7 +210,8 @@ struct lp503x_config_s
 };
 
 /* struct use for most/all ioctl calls */
-struct ioctl_arg_s 
+
+struct ioctl_arg_s
 {
   uint8_t lednum;
   uint32_t param;

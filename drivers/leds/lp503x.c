@@ -50,6 +50,7 @@
 /****************************************************************************
  * Private Type Definitions
  ****************************************************************************/
+
 enum lp503x_state
 {
   LP503X_STATE_UNINIT = 0,
@@ -62,19 +63,19 @@ struct lp503x_dev_s
   FAR struct  i2c_master_s    *i2c;
   uint8_t                     i2c_addr;
   int                         count;
-  
+
   /* device configuration/setup data */
-  
+
   FAR struct lp503x_config_s  *lp503x_config;
-  
+
   /* current state of the lp503x device */
-  
+
   enum lp503x_state           state;
 };
 
-struct lp503x_config_s config_default =
+/* A set of default config parameters as set in LED driver Kconfig */
 
-  /* A set of default config parameters as set in LED driver Kconfig */
+struct lp503x_config_s config_default =
 {
 #if defined (CONFIG_LP503X_LOG_MODE)
   .enable_log_mode          = 1,
@@ -103,6 +104,7 @@ struct lp503x_config_s config_default =
 #endif
 
   /* we assume all leds default to independent control, not bank control */
+
   .led_mode[0]  = LP503X_LED_BANK_MODE_DISABLED,
   .led_mode[1]  = LP503X_LED_BANK_MODE_DISABLED,
   .led_mode[2]  = LP503X_LED_BANK_MODE_DISABLED,
@@ -135,19 +137,25 @@ static int lp503x_close(FAR struct file *filep);
 static int lp503x_ioctl(FAR struct file *filep, int cmd,
                            unsigned long arg);
 #ifdef CONFIG_DEBUG_LP503X
-static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv, FAR const char *msg);
+static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
+                                  FAR const char *msg);
 #else
 #  define lp503x_dump_registers(priv, msg);
 #endif 
 static int lp503x_reset(FAR struct lp503x_dev_s *priv);
 static int lp503x_enable(FAR struct lp503x_dev_s *priv, bool enable);
-static int lp503x_set_RGBled(FAR struct lp503x_dev_s *priv, int led, int colour);
-static int lp503x_set_RGBbrightness(FAR struct lp503x_dev_s *priv, int led, int brightness);
-static int lp503x_set_OUTcolour(FAR struct lp503x_dev_s *priv, int led, int colour);
+static int lp503x_set_rgbled(FAR struct lp503x_dev_s *priv, int led,
+                             int colour);
+static int lp503x_set_rgbbrightness(FAR struct lp503x_dev_s *priv, int led,
+                                    int brightness);
+static int lp503x_set_outcolour(FAR struct lp503x_dev_s *priv, int led,
+                                int colour);
 static int lp503x_set_config(FAR struct lp503x_dev_s *priv);
 static int lp503x_set_bank_mode(FAR struct lp503x_dev_s *priv);
-static int lp503x_set_bank_colour(FAR struct lp503x_dev_s *priv, char bank, int brightness);
-static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv, int brightness);
+static int lp503x_set_bank_colour(FAR struct lp503x_dev_s *priv, char bank,
+                                  int brightness);
+static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv,
+                                      int brightness);
 
 /****************************************************************************
  * Private Data
@@ -170,6 +178,7 @@ static const struct file_operations g_lp503x_fileops =
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
 /****************************************************************************
  * Name: lp503x_dumpregs
  *
@@ -185,118 +194,142 @@ static const struct file_operations g_lp503x_fileops =
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_LP503X
-static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv, FAR const char *msg)
+static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
+                                  FAR const char *msg)
 {
-  uint8_t regval1;
-  uint8_t regval2;
-  uint8_t regval3;
-  uint8_t regval4;
+  uint8_t val1;
+  uint8_t val2;
+  uint8_t val3;
+  uint8_t val4;
   int ret;
-  lp503x_info("lp503x Registers: %s\n", msg); 
-  ret = lp503x_i2c_read_reg(priv, LP503X_DEVICE_CONFIG0,    &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_DEVICE_CONFIG1,    &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED_CONFIG0,       &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED_CONFIG1,       &regval4);
+  lp503x_info("lp503x Registers: %s\n", msg);
+  ret = lp503x_i2c_read_reg(priv, LP503X_DEVICE_CONFIG0,   &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_DEVICE_CONFIG1,   &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED_CONFIG0,      &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED_CONFIG1,      &val4);
   lp503x_info
-    ("Dev Config0: %02x Dev Conf1: %02x LED Conf0    %02x: LED Conf1    %02x:\n",
-                                      regval1, regval2, regval3, regval4);      
-  
-  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_BRIGHTNESS,   &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_A_COLOUR,     &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_B_COLOUR,     &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_C_COLOUR,     &regval4);
-  lp503x_info
-    ("Bank Bright: %02x BankA Col  %02x BankB Col    %02x: BankC Col    %02x:\n",
-                                      regval1, regval2, regval3, regval4);        
-   
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS,   &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+1, &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+2, &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+3, &regval4);
-  lp503x_info
-    ("LED0 Bright: %02x LED1 Col   %02x LED2 Bright  %02x: LED3 Bright  %02x:\n",
-                                      regval1, regval2, regval3, regval4);       
-    
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+4, &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+5, &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+6, &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+7, &regval4);
-  lp503x_info
-    ("LED4 Bright: %02x LED5 Col   %02x LED6 Bright  %02x: LED7 Bright  %02x:\n",
-                                      regval1, regval2, regval3, regval4);      
-   
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+8, &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+9, &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+10,&regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS+11,&regval4);
-  lp503x_info
-    ("LED8 Bright: %02x LED9 Col   %02x LED10 Bright %02x: LED11 Bright %02x:\n",
-                                      regval1, regval2, regval3, regval4);       
-    
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR,       &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+1,     &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+2,     &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+3,     &regval4);
-  lp503x_info
-    ("Out0 Col:    %02x Out1 Col   %02x Out2 Col     %02x: Out3 Col     %02x:\n",
-                                      regval1, regval2, regval3, regval4);      
-    
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+4,     &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+5,     &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+6,     &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+7,     &regval4);
-  lp503x_info
-    ("Out4 Col:    %02x Out5 Col   %02x Out6 Col     %02x: Out7 Col     %02x:\n",
-                                      regval1, regval2, regval3, regval4);      
-   
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+8,     &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+9,     &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+10,    &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+11,    &regval4);
-  lp503x_info
-    ("Out8 Col:    %02x Out9 Col   %02x Out10 Col    %02x: Out11 Col    %02x:\n",
-                                      regval1, regval2, regval3, regval4);       
-    
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+12,    &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+13,    &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+14,    &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+15,    &regval4);
-  lp503x_info
-    ("Out12 Col:   %02x Out13 Col  %02x Out14 Col    %02x: Out15 Col    %02x:\n",
-                                      regval1, regval2, regval3, regval4);
-  
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+16,    &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+17,    &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+18,    &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+19,    &regval4);
-  lp503x_info
-    ("Out16 Col:   %02x Out17 Col  %02x Out18 Col    %02x: Out19 Col    %02x:\n",
-                                      regval1, regval2, regval3, regval4);        
-    
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+20,    &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+21,    &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+22,    &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+23,    &regval4);
-  lp503x_info
-    ("Out20 Col:   %02x Out21 Col  %02x Out22 Col    %02x: Out23 Col    %02x:\n",
-                                      regval1, regval2, regval3, regval4);      
+    ("Dev Config0:\t%02x Dev Conf1:\t%02x \
+    LED Conf0:\t%02x: LED Conf1: \t %02x\n",
+    val1, val2, val3, val4);
 
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+24,    &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+25,    &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+26,    &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+27,    &regval4); 
+  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_BRIGHTNESS,  &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_A_COLOUR,    &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_B_COLOUR,    &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_BANK_C_COLOUR,    &val4);
   lp503x_info
-    ("Out24 Col:   %02x Out25 Col  %02x Out26 Col    %02x: Out27 Col    %02x:\n",   
-                                      regval1, regval2, regval3, regval4);
-                                      
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+28,    &regval1);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+29,    &regval2);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+30,    &regval3);
-  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR+31,    &regval4);
+    ("Bank Bright:\t%02x BankA Col:\t%02x \
+    BankB Col:\t%02x: BankC Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED0_BRIGHTNESS,  &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED1_BRIGHTNESS,  &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED2_BRIGHTNESS,  &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED3_BRIGHTNESS,  &val4);
   lp503x_info
-    ("Out28 Col:   %02x Out29 Col  %02x Out30 Col    %02x: Out31 Col    %02x:\n",
-                                      regval1, regval2, regval3, regval4);       
- }
+    ("LED0 Bright:\t%02x LED1 Col:\t%02x \
+    LED2 Bright:\t%02x: LED3 Bright: %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED4_BRIGHTNESS,  &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED5_BRIGHTNESS,  &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED6_BRIGHTNESS,  &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED7_BRIGHTNESS,  &val4);
+  lp503x_info
+    ("LED4 Bright:\t%02x LED5 Bright:\t%02x \
+    LED6 Bright:\t%02x: LED7 Bright: %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED8_BRIGHTNESS,  &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED9_BRIGHTNESS,  &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED10_BRIGHTNESS, &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_LED11_BRIGHTNESS, &val4);
+  lp503x_info
+    ("LED8 Bright:\t%02x LED9 Bright:\t%02x \
+    LED10 Bright:\t%02x: LED11 Bright:%02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT0_COLOUR,      &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT1_COLOUR,      &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT2_COLOUR,      &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT3_COLOUR,      &val4);
+  lp503x_info
+    ("Out0 Col:\t%02x Out1 Col:\t%02x \
+    Out2 Col:\t\t%02x  Out3 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT4_COLOUR,      &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT5_COLOUR,      &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT6_COLOUR,      &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT7_COLOUR,      &val4);
+  lp503x_info
+    ("Out4 Col:\t%02x Out5 Col:\t%02x \
+    Out6 Col:\t\t%02x  Out7 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT8_COLOUR,      &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT9_COLOUR,      &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT10_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT11_COLOUR,     &val4);
+  lp503x_info
+     ("Out8 Col:\t%02x Out9 Col:\t%02x \
+     Out10 Col:\t%02x  Out11 Col:\t %02x\n",
+     val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT12_COLOUR,     &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT13_COLOUR,     &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT14_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT15_COLOUR,     &val4);
+  lp503x_info
+    ("Out12 Col:\t%02x Out13 Col:\t%02x \
+    Out14 Col:\t%02x  Out15 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT16_COLOUR,     &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT17_COLOUR,     &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT18_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT19_COLOUR,     &val4);
+  lp503x_info
+    ("Out16 Col:\t%02x Out17 Col:\t%02x \
+    Out18 Col:\t%02x  Out19 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT20_COLOUR,     &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT21_COLOUR,     &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT22_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT23_COLOUR,     &val4);
+  lp503x_info
+    ("Out20 Col:\t%02x Out21 Col:\t%02x \
+    Out22 Col:\t%02x  Out23 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT24_COLOUR,     &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT25_COLOUR,     &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT26_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT27_COLOUR,     &val4);
+  lp503x_info
+    ("Out24 Col:\t%02x Out25 Col:\t%02x \
+    Out26 Col:\t%02x  Out27 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT28_COLOUR,     &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT29_COLOUR,     &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT30_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT31_COLOUR,     &val4);
+  lp503x_info
+    ("Out28 Col:\t%02x Out29 Col:\t%02x \
+    Out30 Col:\t%02x  Out31 Col:\t %02x\n",
+    val1, val2, val3, val4);
+
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT32_COLOUR,     &val1);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT33_COLOUR,     &val2);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT34_COLOUR,     &val3);
+  ret = lp503x_i2c_read_reg(priv, LP503X_OUT35_COLOUR,     &val4);
+  lp503x_info
+    ("Out28 Col:\t%02x Out29 Col:\t%02x \
+    Out30 Col:\t%02x  Out31 Col:\t %02x\n",
+    val1, val2, val3, val4);
+}
+
 #endif
 /****************************************************************************
  * Name: lp503x_i2c_write_reg
@@ -317,8 +350,6 @@ static int lp503x_i2c_write_reg(FAR struct lp503x_dev_s *priv,
 
   uint8_t const BUFFER_SIZE = 2;
   uint8_t buffer[BUFFER_SIZE];
-  
-
 
   buffer[0] = reg_addr;
   buffer[1] = reg_val;
@@ -367,7 +398,6 @@ static int lp503x_i2c_read_reg(FAR struct lp503x_dev_s *priv,
 
   /* Write the register address followed by the data (no RESTART) */
 
-
   ret = i2c_write(priv->i2c, &config, &reg_addr, 1);
   ret = i2c_read(priv->i2c, &config, regval, 1);
 
@@ -390,17 +420,18 @@ static int lp503x_open(FAR struct file *filep)
 
   ledinfo("INFO: Opening, resetting and enabling the LP503X for business\n");
 
-  /*reset and enable the device*/
+  /* reset and enable the device */
 
   /* means the device was possibly never regsitered? */
+
   if (priv->state == LP503X_STATE_UNINIT)
     {
       return -ENODEV;
-    }  
+    }
   else if (priv->state == LP503X_STATE_RESET)
     {
       ret = lp503x_enable(priv, true);
-      
+
       if (ret != 0)
         {
           lederr("ERROR: unable to enable lp503x\n");
@@ -408,17 +439,21 @@ static int lp503x_open(FAR struct file *filep)
         }
       else
         {
-          /*use device defaults*/
+          /* use device defaults */
+
           priv->lp503x_config = &config_default;
         }
+
       ret = lp503x_set_config(priv);
       if (ret != 0)
         {
           lederr("ERROR: Unable to set device config: %d\n", ret);
           return -EIO;
         }
+
       priv->state = LP503X_STATE_CONFIGURED;
     }
+
   lp503x_dump_registers(priv, "File Open");
   return ret;
 }
@@ -437,12 +472,7 @@ static int lp503x_close(FAR struct file *filep)
 
   FAR struct inode *inode = filep->f_inode;
   FAR struct lp503x_dev_s *priv = inode->i_private;
-  /*FAR struct lp503x_config_s *config;
-  
-  config = priv->lp503x_config;
-  config->enable_all_led_shutdown = true;
-  return lp503x_set_config(priv);*/
-  
+
   ret = lp503x_enable(priv, false);
   if (ret < 0)
     {
@@ -451,6 +481,7 @@ static int lp503x_close(FAR struct file *filep)
 
   return ret;
 }
+
 /****************************************************************************
  * Name: lp503x_reset
  *
@@ -458,13 +489,14 @@ static int lp503x_close(FAR struct file *filep)
  *   Resets all registers to default values
  *
  ****************************************************************************/
+
 static int lp503x_reset(FAR struct lp503x_dev_s *priv)
 {
   FAR struct lp503x_config_s *config;
   int ret;
-  
+
   config = priv->lp503x_config;
-  
+
   ret = lp503x_i2c_write_reg(priv, LP503X_RESET, LP503X_RESET_ALL_REGISTERS);
   if (ret != 0)
     {
@@ -488,26 +520,22 @@ static int lp503x_reset(FAR struct lp503x_dev_s *priv)
 static int lp503x_enable(FAR struct lp503x_dev_s *priv, bool enable)
 {
   int ret;
-  /*FAR struct lp503x_config_s *config;
-  
-  config = priv->lp503x_config;
-  
-  config->enable_all_led_shutdown = enable;
-  return lp503x_set_config(priv);*/
-  
+
   if (enable)
     {
-      ret = lp503x_i2c_write_reg(priv, LP503X_DEVICE_CONFIG0, LP503X_CHIP_ENABLE);
+      ret = lp503x_i2c_write_reg(priv, LP503X_DEVICE_CONFIG0,
+                                       LP503X_CHIP_ENABLE);
       ledinfo("INFO: LP503x enabled\n");
     }
   else
     {
-      ret = lp503x_i2c_write_reg(priv, LP503X_DEVICE_CONFIG0, LP503X_CHIP_DISABLE);
+      ret = lp503x_i2c_write_reg(priv, LP503X_DEVICE_CONFIG0,
+                                       LP503X_CHIP_DISABLE);
       ledinfo("INFO: LP503x disabled\n");
     }
+
   return ret;
 }
-
 
 /****************************************************************************
  * Name: lp503x_set_config
@@ -516,14 +544,15 @@ static int lp503x_enable(FAR struct lp503x_dev_s *priv, bool enable)
  *   configures basic operation modes of the device
  *
  ****************************************************************************/
+
 static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
 {
   int ret;
-  uint8_t regval; 
+  uint8_t regval;
   FAR struct lp503x_config_s *config;
-  
+
   config = priv->lp503x_config;
-  
+
   ret = lp503x_i2c_read_reg(priv, LP503X_DEVICE_CONFIG1, &regval);
   if (config->enable_log_mode)
     {
@@ -533,6 +562,7 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
     {
       regval &= ~LP503X_CONFIG1_LOG_SCALE;
     }
+
   if (config->enable_power_save)
     {
       regval |= LP503X_CONFIG1_PWRSAVE;
@@ -541,6 +571,7 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
     {
       regval &= ~LP503X_CONFIG1_PWRSAVE;
     }
+
   if (config->enable_pwm_dithering)
     {
       regval |= LP503X_CONFIG1_DITHERING;
@@ -549,6 +580,7 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
     {
       regval &= ~LP503X_CONFIG1_DITHERING;
     }
+
   if (config->set_max_current_35ma)
     {
       regval |= LP503X_CONFIG1_PWRSAVE;
@@ -557,6 +589,7 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
     {
       regval &= ~LP503X_CONFIG1_PWRSAVE;
     }
+
   if (config->enable_all_led_shutdown)
     {
       regval |= LP503X_CONFIG1_GLOBAL_OFF;
@@ -565,12 +598,11 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
     {
       regval &= ~LP503X_CONFIG1_GLOBAL_OFF;
     }
-  
+
   ret = lp503x_i2c_write_reg(priv, LP503X_DEVICE_CONFIG1, regval);
-  
+
   return ret;
 }
-
 
 /****************************************************************************
  * Name: lp503x_set_bank_brightness
@@ -579,15 +611,17 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
  *   sets banks to the  required brightness
  *
  ****************************************************************************/
-static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv, int brightness)
+
+static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv,
+                                      int brightness)
 {
   int ret;
-  
+
   if (brightness > MAX_BRIGHTNESS)
     {
       return -EINVAL;
     }
-  else 
+  else
     {
       return lp503x_i2c_write_reg(priv, LP503X_BANK_BRIGHTNESS, brightness);
     }
@@ -600,27 +634,32 @@ static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv, int brightn
  *   sets bank A, B or C led to required coloiur (mix)
  *
  ****************************************************************************/
-static int lp503x_set_bank_colour(FAR struct lp503x_dev_s *priv, char bank, int brightness)
+
+static int lp503x_set_bank_colour(FAR struct lp503x_dev_s *priv, char bank,
+                                  int brightness)
 {
   int ret;
-  
+
   if (brightness > MAX_BRIGHTNESS)
     {
       return -EINVAL;
     }
-  else 
+  else
     {
       if (bank == 'A')
         {
-          return lp503x_i2c_write_reg(priv, LP503X_BANK_A_COLOUR, brightness);
+          return lp503x_i2c_write_reg(priv, LP503X_BANK_A_COLOUR,
+                                      brightness);
         }
       else if (bank == 'B')
         {
-          return lp503x_i2c_write_reg(priv, LP503X_BANK_B_COLOUR, brightness);
+          return lp503x_i2c_write_reg(priv, LP503X_BANK_B_COLOUR,
+                                      brightness);
         }
       else if (bank == 'C')
         {
-          return lp503x_i2c_write_reg(priv, LP503X_BANK_C_COLOUR, brightness);
+          return lp503x_i2c_write_reg(priv, LP503X_BANK_C_COLOUR,
+                                      brightness);
         }
       else
         {
@@ -642,11 +681,11 @@ static int lp503x_set_bank_mode(FAR struct lp503x_dev_s *priv)
   int ret;
   int count;
   int regval;
-  
+
   FAR struct lp503x_config_s *config;
-  
+
   config = priv->lp503x_config;
-  
+
   regval = 0;
   for (count = 0; count < 8; count++)
     {
@@ -659,63 +698,67 @@ static int lp503x_set_bank_mode(FAR struct lp503x_dev_s *priv)
           regval &= ~(LP503X_LED0_BANK_ENABLE << count);
         }
     }
+
   ret = lp503x_i2c_write_reg(priv, LP503X_LED_CONFIG0, regval);
 
   for (count = 8; count < 12; count++)
     {
       if (config->led_mode[count] == LP503X_LED_BANK_MODE_ENABLED)
         {
-          regval |= (LP503X_LED0_BANK_ENABLE << (count-8));
+          regval |= (LP503X_LED0_BANK_ENABLE << (count - 8));
         }
       else
         {
-          regval &= ~(LP503X_LED0_BANK_ENABLE << (count-8));
+          regval &= ~(LP503X_LED0_BANK_ENABLE << (count - 8));
         }
     }
-  ret = lp503x_i2c_write_reg(priv, LP503X_LED_CONFIG1, regval);  
+
+  ret = lp503x_i2c_write_reg(priv, LP503X_LED_CONFIG1, regval);
 
   return ret;
 }
 
-
 /****************************************************************************
- * Name: lp503x_set_RGBled
+ * Name: lp503x_set_rgbled
  *
  * Description:
  *   sets RGB led to chosen html colour
  *
  ****************************************************************************/
-static int lp503x_set_RGBled_colour(FAR struct lp503x_dev_s *priv, int led, int colour)
+
+static int lp503x_set_rgbled_colour(FAR struct lp503x_dev_s *priv,
+                                    int led, int colour)
 {
   int ret;
   int regaddr;
-  
+
   if ((led > MAX_RGB_LEDS) || (colour > MAX_RGB_COLOUR))
     {
       ret = -EINVAL;
     }
-  else 
+  else
     {
-      regaddr = LP503X_LED0_COLOUR + (3*led);
+      regaddr = LP503X_OUT0_COLOUR + (3*led);
 
-      ret = lp503x_i2c_write_reg(priv, regaddr++, (colour>>16) & 0xFF);
-      ret = lp503x_i2c_write_reg(priv, regaddr++, (colour>>8)  & 0xFF);
-      ret = lp503x_i2c_write_reg(priv, regaddr,   (colour>>0)  & 0xFF);
+      ret = lp503x_i2c_write_reg(priv, regaddr++, (colour >> 16) & 0xff);
+      ret = lp503x_i2c_write_reg(priv, regaddr++, (colour >> 8)  & 0xff);
+      ret = lp503x_i2c_write_reg(priv, regaddr,   (colour >> 0)  & 0xff);
       ledinfo("INFO: RGB LED %d set to RGB colour %06x\n", led, colour);
     }
-    
+
   return ret;
 }
 
-
 /****************************************************************************
- * Name: lp503x_set_OUTcolour
+ * Name: lp503x_set_outcolour
  *
  * Description:
  *   Sets OUT brightness ("colour" of individual LED outputs
  *
  ****************************************************************************/
-static int lp503x_set_OUTcolour(FAR struct lp503x_dev_s *priv, int led, int brightness)
+
+static int lp503x_set_outcolour(FAR struct lp503x_dev_s *priv, int led,
+                                int brightness)
 {
   int ret;
   if ((led > MAX_LEDS) || (brightness > MAX_BRIGHTNESS))
@@ -723,37 +766,42 @@ static int lp503x_set_OUTcolour(FAR struct lp503x_dev_s *priv, int led, int brig
       ret = -EINVAL;
     }
   else
-  {
-    ret = lp503x_i2c_write_reg(priv, LP503X_OUT0_COLOUR + led, brightness);
-    ledinfo("INFO: individual LED %d set to brightness %d\n", led, brightness);
-  }
+    {
+      ret = lp503x_i2c_write_reg(priv, LP503X_OUT0_COLOUR + led, brightness);
+      ledinfo("INFO: individual LED %d set to brightness %d\n", led,
+              brightness);
+    }
+
   return ret;
 }
 
-
 /****************************************************************************
- * Name: lp503x_set_RGBbrightness
+ * Name: lp503x_set_rgbbrightness
  *
  * Description:
  *   Sets brightness of all RGB LED
  *
  ****************************************************************************/
-static int lp503x_set_RGBbrightness(FAR struct lp503x_dev_s *priv, int led, int brightness)
+
+static int lp503x_set_rgbbrightness(FAR struct lp503x_dev_s *priv, int led,
+                                    int brightness)
 {
   int ret;
-  
+
   if ((led > MAX_RGB_LEDS) || (brightness > MAX_BRIGHTNESS))
     {
       ret = -EINVAL;
     }
-  else   
+  else
     {
-      ret = lp503x_i2c_write_reg(priv, LP503X_LED0_BRIGHTNESS + led, brightness);
+      ret = lp503x_i2c_write_reg(priv, LP503X_LED0_BRIGHTNESS + led,
+                                 brightness);
       ledinfo("INFO: LED %d set to brightness %d\n", led, brightness);
     }
-  return ret;
 
+  return ret;
 }
+
 /****************************************************************************
  * Name: lp503x_ioctl
  *
@@ -772,7 +820,7 @@ static int lp503x_ioctl(FAR struct file *filep, int cmd,
   int ret;
   int regval;
   FAR const struct ioctl_arg_s *lp503x_ioctl_args;
-  
+
   config = priv->lp503x_config;
 
   lp503x_ioctl_args = arg;
@@ -786,51 +834,65 @@ static int lp503x_ioctl(FAR struct file *filep, int cmd,
         config->enable_all_led_shutdown = lp503x_ioctl_args->param;
         ret = lp503x_set_config(priv);
       break;
-      
+
       case PWMIOC_RESET:  /* no args */
         lp503x_reset(priv);
       break;
-      
-      case PWMIOC_ENABLE_LED_BANK_MODE: /* led(0..11), mode required                 */
-        ledinfo("INFO: setting LED %d mode to %d\n", lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
-        config->led_mode[lp503x_ioctl_args->lednum] = lp503x_ioctl_args->param;
+
+      case PWMIOC_ENABLE_LED_BANK_MODE: /* led(0..11), mode required */
+        ledinfo("INFO: setting LED %d mode to %d\n",
+                 lp503x_ioctl_args->lednum,
+                 lp503x_ioctl_args->param);
+        config->led_mode[lp503x_ioctl_args->lednum] =
+                         lp503x_ioctl_args->param;
         lp503x_set_bank_mode(priv);
       break;
-      
+
       case PWMIOC_SET_BANK_MIX_COLOUR:/* bank(A/B/C),level(0-255)   */
-        ledinfo("INFO: setting bank %c to brightness %d\n", lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
-        ret = lp503x_set_bank_colour(priv, lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ledinfo("INFO: setting bank %c to brightness %d\n",
+                 lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ret = lp503x_set_bank_colour(priv, lp503x_ioctl_args->lednum,
+                                     lp503x_ioctl_args->param);
       break;
-      
+
       case PWMIOC_SET_BANK_BRIGHTNESS:
-        ledinfo("INFO: setting bank brightness to %d\n", lp503x_ioctl_args->param);
+        ledinfo("INFO: setting bank brightness to %d\n",
+                 lp503x_ioctl_args->param);
         lp503x_set_bank_brightness(priv, lp503x_ioctl_args->param);
       break;
-      
+
       case PWMIOC_CONFIG: /* config is struct within priv */
         ledinfo("INFO: setting device config to:\n");
         ledinfo("\tlog mode          = %d\n",  config->enable_log_mode);
         ledinfo("\tpower save        = %d\n",  config->enable_power_save);
         ledinfo("\tpwm dithering     = %d\n",  config->enable_pwm_dithering);
-        ledinfo("\tmax current       = %s\n", (config->set_max_current_35ma) ? "30mA" : "25.5mA");
-        ledinfo("\tall leds shutdown = %d\n",  config->enable_all_led_shutdown);
-        
+        ledinfo("\tmax current       = %s\n", (config->set_max_current_35ma)
+                                        ? "30mA" : "25.5mA");
+        ledinfo("\tall leds shutdown = %d\n",
+                  config->enable_all_led_shutdown);
+
         ret = lp503x_set_config(priv);
       break;
-      
+
       case PWMIOC_SET_LED_COLOUR: /* led(0..35), Colour(0..255) */
-        ledinfo("INFO: set LED %d to colour/brightness %d\n", lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
-        ret = lp503x_set_OUTcolour(priv, lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ledinfo("INFO: set LED %d to colour/brightness %d\n",
+                 lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ret = lp503x_set_outcolour(priv, lp503x_ioctl_args->lednum,
+                                   lp503x_ioctl_args->param);
       break;
-      
+
       case PWMIOC_SET_RGB_BRIGHTNESS: /* led(0..11), level(0..255)  */
-        ledinfo("INFO: requested brightness level %d for led %d\n", lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
-        ret = lp503x_set_RGBbrightness(priv, lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ledinfo("INFO: requested brightness level %d for led %d\n",
+                 lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ret = lp503x_set_rgbbrightness(priv, lp503x_ioctl_args->lednum,
+                                       lp503x_ioctl_args->param);
       break;
-      
+
       case PWMIOC_SET_RGB_COLOUR: /* led(0..11)                 */
-        ledinfo("requested led %d to be RGB colour = 0x%06x\n", lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
-        ret = lp503x_set_RGBled_colour(priv, lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ledinfo("requested led %d to be RGB colour = 0x%06x\n",
+                 lp503x_ioctl_args->lednum, lp503x_ioctl_args->param);
+        ret = lp503x_set_rgbled_colour(priv, lp503x_ioctl_args->lednum,
+                                       lp503x_ioctl_args->param);
       break;
 
       default: /* The used ioctl command was invalid */
@@ -868,17 +930,17 @@ int lp503x_register(FAR const char *devpath, FAR struct i2c_master_s *i2c,
                        uint8_t const lp503x_i2c_addr)
 {
   int ret;
-  /* Sanity check */
-  DEBUGASSERT(devpath != NULL && i2c != NULL);
 
+  /* Sanity check */
+
+  DEBUGASSERT(devpath != NULL && i2c != NULL);
 
   /* Initialize the LP503X device structure */
 
   FAR struct lp503x_dev_s *priv =
     (FAR struct lp503x_dev_s *)kmm_malloc(sizeof(struct lp503x_dev_s));
-    
-  FAR struct lp503x_config_s *config;
 
+  FAR struct lp503x_config_s *config;
 
   if (priv == NULL)
     {
@@ -909,8 +971,10 @@ int lp503x_register(FAR const char *devpath, FAR struct i2c_master_s *i2c,
           lederr("ERROR: failed to reset lp503x device\n");
           return ret;
         }
+
       priv->state = LP503X_STATE_RESET;
     }
+
   return OK;
 }
 
