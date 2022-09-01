@@ -848,8 +848,8 @@ struct sam_msgram_s
 
 struct sam_config_s
 {
-  uint32_t rxpinset;   /* RX pin configuration */
-  uint32_t txpinset;   /* TX pin configuration */
+  uint32_t rxpinset;        /* RX pin configuration */
+  uint32_t txpinset;        /* TX pin configuration */
   uintptr_t base;           /* Base address of the MCAN registers */
   uint32_t baud;            /* Configured baud */
   uint32_t btp;             /* Bit timing/prescaler register setting */
