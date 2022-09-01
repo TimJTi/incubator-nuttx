@@ -50,3 +50,50 @@ uImage
 boards/arm/sama5/jti-toucan2/src/sam_can_not_needed.c
 arch/arm/src/sama5/sam_flexcom_spi (2).h
 boards/diffs ib boards-kconfig
+arch/arm/src/.context
+boards/.context
+drivers/.context
+fs/.context
+libs/libc/.context
+libs/libxx/.context
+boards/arm/sama5/jti-toucan2-deprecated/configs/netnsh/defconfig
+boards/arm/sama5/jti-toucan2-deprecated/configs/nsh/defconfig
+boards/arm/sama5/jti-toucan2-deprecated/configs/nsh/defconfig.from early 2022
+boards/arm/sama5/jti-toucan2-deprecated/configs/porting/defconfig
+boards/arm/sama5/jti-toucan2-deprecated/configs/porting/defconfig.dec21
+boards/arm/sama5/jti-toucan2-deprecated/configs/porting/defconfig.Jan22
+boards/arm/sama5/jti-toucan2-deprecated/configs/porting/defconfig.ok
+boards/arm/sama5/jti-toucan2-deprecated/configs/porting/defconfig.old
+boards/arm/sama5/jti-toucan2-deprecated/helpers/netusb-up.sh
+boards/arm/sama5/jti-toucan2-deprecated/include/board.h
+boards/arm/sama5/jti-toucan2-deprecated/include/board_492mhz.h
+boards/arm/sama5/jti-toucan2-deprecated/include/board_memorymap.h
+boards/arm/sama5/jti-toucan2-deprecated/include/board_sdram.h
+boards/arm/sama5/jti-toucan2-deprecated/Kconfig
+boards/arm/sama5/jti-toucan2-deprecated/scripts/dramboot.ld
+boards/arm/sama5/jti-toucan2-deprecated/scripts/gnu-elf.ld
+boards/arm/sama5/jti-toucan2-deprecated/scripts/isram.ld
+boards/arm/sama5/jti-toucan2-deprecated/scripts/Make.defs
+boards/arm/sama5/jti-toucan2-deprecated/scripts/uboot.ld
+boards/arm/sama5/jti-toucan2-deprecated/src/jti-toucan2.h
+boards/arm/sama5/jti-toucan2-deprecated/src/Makefile
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_adc.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_appinit.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_at25.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_audio.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_boot.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_bringup.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_can.c - deprecated
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_classd.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_flexcom_spi.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_fusb302.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_i2c.c - deprecated
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_lp503x.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_mcan.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_ostest.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_pwm.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_reset.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_sdram.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_spi.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_usb.c
+boards/arm/sama5/jti-toucan2-deprecated/src/sam_usbmsc.c
