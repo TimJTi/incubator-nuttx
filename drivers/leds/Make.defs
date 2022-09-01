@@ -64,6 +64,12 @@ ifeq ($(CONFIG_WS2812),y)
   LEDVPATH = :leds
 endif
 
+ifeq ($(CONFIG_LP503X),y)
+  CSRCS += lp503x.c
+  LEDDEPATH = --dep-path leds
+  LEDVPATH = :leds
+endif
+
 # Include LED build support (if any LED drivers were selected)
 
 DEPPATH += $(LEDDEPATH)
