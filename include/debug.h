@@ -610,6 +610,24 @@
 #  define pwminfo     _none
 #endif
 
+#ifdef CONFIG_DEBUG_LED_ERROR
+#  define lederr       _err
+#else
+#  define lederr      _none
+#endif
+
+#ifdef CONFIG_DEBUG_LED_WARN
+#  define ledwarn     _warn
+#else
+#  define ledwarn     _none
+#endif
+
+#ifdef CONFIG_DEBUG_LED_INFO
+#  define ledinfo     _info
+#else
+#  define ledinfo     _none
+#endif
+
 #ifdef CONFIG_DEBUG_RC_ERROR
 #  define rcerr        _err
 #else
