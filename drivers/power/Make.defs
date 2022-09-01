@@ -135,6 +135,12 @@ ifeq ($(CONFIG_I2C_AXP202),y)
 CSRCS += axp202.c
 endif
 
+# Add the act8945a I2C-based battery charger driver
+
+ifeq ($(CONFIG_I2C_ACT8945A),y)
+CSRCS += act8945a.c
+endif
+
 endif
 
 # Include power support in the build
