@@ -43,11 +43,11 @@
 #if (CONFIG_ACT8945A_VSEL == 0)
 #  define ACT8945A_REG1_VSEL ACT8945A_REG1_VSEL_LO
 #  define ACT8945A_REG2_VSEL ACT8945A_REG2_VSEL_LO
-#  define ACT8945A_REG3_VSEL ACT8945A_REG2_VSEL_LO
+#  define ACT8945A_REG3_VSEL ACT8945A_REG3_VSEL_LO
 #else
 #  define ACT8945A_REG1_VSEL ACT8945A_REG1_VSEL_HI
 #  define ACT8945A_REG2_VSEL ACT8945A_REG2_VSEL_HI
-#  define ACT8945A_REG3_VSEL ACT8945A_REG2_VSEL_HI
+#  define ACT8945A_REG3_VSEL ACT8945A_REG3_VSEL_HI
 #endif
 
 #ifdef CONFIG_DEBUG_POWER
@@ -60,6 +60,49 @@
 #  define act8945a_info(x, ...)       uinfo(x, ##__VA_ARGS__)
 #endif
 
+#define CONV_TO_MV(n)                       \
+  ({                                        \
+      int mv;                               \
+      if ((n) < 12)                         \
+        {                                   \
+          mv = (((n) * 25) + 600);          \
+        }                                   \
+      else if ((n) < 48)                    \
+        {                                   \
+          mv = ((((n) -24) * 50) + 1200);   \
+        }                                   \
+      else if ((n) <= 63)                   \
+        {                                   \
+          mv = ((((n) - 48) * 100) + 2400); \
+        }                                   \
+      else                                  \
+      {                                     \
+        mv = -1;                             \
+      }                                     \
+      mv;                                   \
+  })                                        \
+
+#define CONV_FROM_MV(n)                     \
+  ({                                        \
+      uint8_t val;                          \
+      if ((n) < 1200)                       \
+        {                                   \
+          val = (((n) - 600 ) / 25);        \
+        }                                   \
+      else if ((n) < 2400)                  \
+        {                                   \
+          val = ((((n) - 1200) / 50) + 24); \
+        }                                   \
+      else if ((n) <= 3900)                 \
+        {                                   \
+          val = ((((n) - 2400) / 100) + 48);\
+        }                                   \
+      else                                  \
+      {                                     \
+        val = -1;                           \
+      }                                     \
+      val;                                  \
+  })
 /****************************************************************************
  * Private type
  ****************************************************************************/
@@ -247,20 +290,31 @@ static int act8945a_enable_reg(FAR struct act8945a_dev_s *priv,
   
   ret = act8945a_getreg(priv, reg_enable_register[regulator], &regval);
 
-  if (enable)
+  if ((enable) && !(regval & 0x80))
     {
+      /* we want to enable the regaultor and it wasn't enabled before */
+
       regval &= ~0x80;
       act8945a_info("INFO: Setting regulator %d enable bit to %x\n", (regulator + 1), regval);
       regval |= 0x80;
+      act8945a_info("INFO: Setting regulator %d enable bit to %x\n", (regulator + 1), regval);
+    }
+  else if ((!enable) && (regval & 0x80))
+    {
+      /* we want to disable the regulator and it was enabled before */
+
+      regval |= 0x80;
+      act8945a_info("INFO: Setting regulator %d enable bit to %x\n", (regulator + 1), regval);
+      regval &= ~0x80;
       act8945a_info("INFO: Setting regulator %d enable bit to %x\n", (regulator + 1), regval);
     }
   else
     {
-      regval |= 0x80;
-      act8945a_info("INFO: Setting regulator %d enable bit to %x\n", (regulator + 1), regval);
-      regval &= ~0x80;
-      act8945a_info("INFO: Setting regulator %d enable bit to %x\n", (regulator + 1), regval);
+      act8945a_info("INFO: no change to regulator %d enable/disable required\n", (regulator+1));
+      return OK;
     }
+
+  ret = act8945a_putreg(priv, reg_enable_register[regulator], regval);
   return ret;
   
 }
@@ -278,37 +332,48 @@ static int act8945a_set_reg_voltage(FAR struct act8945a_dev_s *priv,
                                     enum act8945a_regulator regulator, 
                                     int voltreqd)
 {
-  uint8_t volts = 0;
+  uint8_t newvolts;
   int ret = OK;
+  uint8_t curvolts;
   
-  if (voltreqd < 600)
-  {
-    act8945a_warn("WARN: Cannot set regulator %d to %dmV, 600mV used\n", (regulator+1), voltreqd);
-    voltreqd = 600;
-  }
-  if (voltreqd >3900)
-  {
-    act8945a_warn("WARN: Cannot set regulator %d to %dmV, 3900mV used\n", (regulator+1), voltreqd);
-    voltreqd = 3900;
-  }
-  
-  if (voltreqd < 1200)
-  {
-    volts = (voltreqd - 600) / 25;
-  }
-	else if (voltreqd < 2400)
-  {
-		volts = 0x18 + (voltreqd - 1200) / 50;
-	}
-  else if (voltreqd <= 3900)
-  {
-		volts = 0x30 + (voltreqd - 2400) / 100;
-	}
-  
-  act8945a_info("INFO: Setting regulator %d voltage registor to %x\n", (regulator + 1), volts);
-  ret = act8945a_putreg(priv, reg_volt_register[regulator], volts);
-
-  return ret;
+  if ((voltreqd > 3900) || (voltreqd < 600))
+    {
+      act8945a_warn("WARN: Requested voltage out of range for reg %d: %d\n",
+                    (regulator+1), voltreqd);
+      return -EINVAL;
+    }
+  else
+    {
+      newvolts = CONV_FROM_MV(voltreqd);
+      if (newvolts != -1)
+        {
+          ret = act8945a_getreg(priv, reg_volt_register[regulator],
+                                      &curvolts);          
+          if (newvolts != (curvolts &= ACT8945A_VSET_MASK))
+            {
+              act8945a_info("INFO: Setting regulator %d from %dmV to %dmV\n",
+                            (regulator + 1), CONV_TO_MV(curvolts),
+                                             CONV_TO_MV(newvolts));
+              ret = act8945a_putreg(priv,
+                                    reg_volt_register[regulator],
+                                    newvolts);
+              return ret;
+            }
+          else
+            {
+              act8945a_info("INFO: no voltage change required, regulator %d\n",
+                      (regulator+1));
+              return OK;
+            }
+        }
+      else
+        {
+          act8945a_warn("WARN: with ACT8945A volt register calculation\n");
+          return -EINVAL;
+        }
+    }
+    
+  return OK;
 }
 
 
@@ -346,25 +411,56 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
       return NULL;
     }
   */
-  /* Initialise regulator enables */
-  //act8945a_enable_reg(priv, REG1, CONFIG_ACT8945A_REG1_ENABLE);
-  //act8945a_enable_reg(priv, REG2, CONFIG_ACT8945A_REG2_ENABLE);
-  //act8945a_enable_reg(priv, REG3, CONFIG_ACT8945A_REG3_ENABLE);
-  //act8945a_enable_reg(priv, REG4, CONFIG_ACT8945A_REG4_ENABLE);
-  //act8945a_enable_reg(priv, REG5, CONFIG_ACT8945A_REG5_ENABLE);
-  act8945a_enable_reg(priv, REG6, 1);//CONFIG_ACT8945A_REG6_ENABLE);
-  //act8945a_enable_reg(priv, REG7, 0);//CONFIG_ACT8945A_REG7_ENABLE);
-  
-  /* Initialise output voltages */
+  /* Initialise regulators */
 
-  //act8945a_set_reg_voltage(priv, REG1, CONFIG_ACT8945A_REG1_VOLTAGE);
-  //act8945a_set_reg_voltage(priv, REG2, CONFIG_ACT8945A_REG2_VOLTAGE);
-  //act8945a_set_reg_voltage(priv, REG3, CONFIG_ACT8945A_REG3_VOLTAGE);
-  //act8945a_set_reg_voltage(priv, REG4, CONFIG_ACT8945A_REG4_VOLTAGE);
-  //act8945a_set_reg_voltage(priv, REG5, CONFIG_ACT8945A_REG5_VOLTAGE);
+  act8945a_set_reg_voltage(priv, REG1, CONFIG_ACT8945A_REG1_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG1_ENABLE
+  act8945a_enable_reg(priv, REG1, true);
+#else
+  act8945a_enable_reg(priv, REG1, false);
+#endif
+
+  act8945a_set_reg_voltage(priv, REG2, CONFIG_ACT8945A_REG2_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG2_ENABLE
+  act8945a_enable_reg(priv, REG2, true);
+#else
+  act8945a_enable_reg(priv, REG2, false);
+#endif
+
+  act8945a_set_reg_voltage(priv, REG3, CONFIG_ACT8945A_REG3_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG3_ENABLE
+  act8945a_enable_reg(priv, REG3, true);
+#else
+  act8945a_enable_reg(priv, REG3, false);
+#endif
+
+  act8945a_set_reg_voltage(priv, REG4, CONFIG_ACT8945A_REG4_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG4_ENABLE
+  act8945a_enable_reg(priv, REG4, true);
+#else
+  act8945a_enable_reg(priv, REG4, false);
+#endif
+
+  act8945a_set_reg_voltage(priv, REG5, CONFIG_ACT8945A_REG5_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG5_ENABLE
+  act8945a_enable_reg(priv, REG5, true);
+#else
+  act8945a_enable_reg(priv, REG5, false);
+#endif
+
   act8945a_set_reg_voltage(priv, REG6, CONFIG_ACT8945A_REG6_VOLTAGE);
-  //act8945a_set_reg_voltage(priv, REG7, CONFIG_ACT8945A_REG7_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG6_ENABLE
+  act8945a_enable_reg(priv, REG6, true);
+#else
+  act8945a_enable_reg(priv, REG6, false);
+#endif
 
+  act8945a_set_reg_voltage(priv, REG7, CONFIG_ACT8945A_REG7_VOLTAGE);
+#ifdef CONFIG_ACT8945A_REG7_ENABLE
+  act8945a_enable_reg(priv, REG7, true);
+#else
+  act8945a_enable_reg(priv, REG7, false);
+#endif  
   return (FAR struct battery_charger_dev_s *)priv;
 }
 
