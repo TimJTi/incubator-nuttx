@@ -27,8 +27,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <string.h>
 #include <debug.h>
+#include <poll.h>
+#include <fcntl.h>
 #include <assert.h>
+#include <nuttx/fs/fs.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/i2c/i2c_master.h>
 #include <nuttx/power/battery_charger.h>
@@ -106,13 +110,27 @@
 /****************************************************************************
  * Private type
  ****************************************************************************/
+struct act8945a_priv_s
+{
+  struct list_node  node;
+  sem_t             lock;
+  sem_t             wait;
+  uint32_t          mask;
+  FAR struct pollfd *fds;
+};
 
 struct act8945a_dev_s
 {
   /* The common part of the battery driver visible to the upper-half driver */
+  /* Fields required by the upper-half driver */
 
   FAR const struct battery_charger_operations_s *ops; /* Battery operations */
-  sem_t batsem;                                       /* Enforce mutually exclusive access */
+
+  sem_t batsem;  /* Enforce mutually exclusive access */
+
+  struct list_node flist;
+
+  //FAR const struct act8945a_operations_s *ops; /* Battery operations */
 
   /* Data fields specific to the lower half act8945a driver follow */
 
@@ -137,6 +155,18 @@ enum act8945a_regulator
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
+/* Character driver methods */
+
+static int     act8945a_open(FAR struct file *filep);
+static int     act8945a_close(FAR struct file *filep);
+static ssize_t act8945a_read(FAR struct file *filep, FAR char *buffer,
+                                size_t buflen);
+static ssize_t act8945a_write(FAR struct file *filep,
+                                 FAR const char *buffer, size_t buflen);
+static int     act8945a_ioctl(FAR struct file *filep, int cmd,
+                                 unsigned long arg);
+static int     act8945a_poll(FAR struct file *filep,
+                                FAR struct pollfd *fds, bool setup);
 
 /* I2C support */
 
@@ -147,36 +177,437 @@ static int act8945a_putreg(FAR struct act8945a_dev_s *priv, uint8_t regaddr,
 
 /* Battery driver lower half methods */
 
+
 static int act8945a_enable_reg(FAR struct act8945a_dev_s *priv,
                                     enum act8945a_regulator, bool enable);
 static int act8945a_set_reg_voltage(FAR struct act8945a_dev_s *priv,
                                     enum act8945a_regulator, int voltage);
+static int act8945a_enable_lowiq(FAR struct act8945a_dev_s *priv,
+                                    enum act8945a_regulator, bool enable);
                                  
 static int act8945a_status(FAR struct act8945a_dev_s *priv,
                            FAR int *status);
+
+static const struct battery_charger_operations_s g_act8945a_ops = 
+{
+  act8945a_status,
+};
+
+/****************************************************************************
+ * Things to do
+ * ------------
+ *
+ * All the fileops stuff
+ *
+ * Allow Vset reg to be set. Dangerous?
+ * Phase, mode, delay. Dangerous?
+ * regs 4/5/6/7
+ * - output discharge control
+ * - Low-IQ mode
+ 
+ * System voltage monitor 
+ * - programmable SYSLEV level
+ * - mode: interrupt source or shutdown
+ * - mode - 
+ * Interrupts
+ * fault mask stuff
+ * - pin config and driver side of things (example app?
+ * - determine what interrupts are enabled (default and ioctl)
+ *   - syslev
+ *   - 
+ * Charger functionality
+ * - OVP charge threshold config
+****************************************************************************/
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-static const uint8_t reg_volt_register[] = {ACT8945A_REG1_VSEL, ACT8945A_REG2_VSEL,
-                                     ACT8945A_REG3_VSEL, ACT8945A_REG4_VSEL,
-                                     ACT8945A_REG5_VSEL, ACT8945A_REG6_VSEL,
-                                     ACT8945A_REG7_VSEL};
-static const uint8_t reg_enable_register[] = {ACT8945A_REG1_CONTROL, ACT8945A_REG2_CONTROL,
-                                     ACT8945A_REG3_CONTROL, ACT8945A_REG4_CONTROL,
-                                     ACT8945A_REG5_CONTROL, ACT8945A_REG6_CONTROL,
-                                     ACT8945A_REG7_CONTROL};
-                                     
 
-static const struct battery_charger_operations_s g_act8945aops =
+static const struct file_operations g_batteryops =
 {
-  act8945a_status,
+  act8945a_open,    /* open */
+  act8945a_close,   /* close */
+  act8945a_read,    /* read */
+  act8945a_write,   /* write */
+  NULL,                /* seek */
+  act8945a_ioctl,   /* ioctl */
+  act8945a_poll     /* poll */
+#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+  , NULL               /* unlink */
 
 };
+#endif
+static const uint8_t reg_volt_register[] =
+                    {ACT8945A_REG1_VSEL, ACT8945A_REG2_VSEL,
+                     ACT8945A_REG3_VSEL, ACT8945A_REG4_VSEL,
+                     ACT8945A_REG5_VSEL, ACT8945A_REG6_VSEL,
+                     ACT8945A_REG7_VSEL
+};
+static const uint8_t reg_enable_register[] =
+                    {ACT8945A_REG1_CONTROL, ACT8945A_REG2_CONTROL,
+                     ACT8945A_REG3_CONTROL, ACT8945A_REG4_CONTROL,
+                     ACT8945A_REG5_CONTROL, ACT8945A_REG6_CONTROL,
+                     ACT8945A_REG7_CONTROL
+};
+static const uint8_t reg_control_register[] =
+                    {ACT8945A_REG1_CONTROL, ACT8945A_REG2_CONTROL,
+                     ACT8945A_REG3_CONTROL, ACT8945A_REG4_CONTROL,
+                     ACT8945A_REG5_CONTROL, ACT8945A_REG6_CONTROL,
+                     ACT8945A_REG7_CONTROL
+                    };
+#if 0
+static const struct act8945a_operations_s g_act8945aops =
+{
+  act8945a_status,
+};
+#endif
 
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+ static int act8945a_notify(FAR struct act8945a_priv_s *priv,
+                                  uint32_t mask)
+{
+  FAR struct pollfd *fd = priv->fds;
+  int semcnt;
+  int ret;
+
+  if (!fd)
+    {
+      return OK;
+    }
+
+  ret = nxsem_wait_uninterruptible(&priv->lock);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  priv->mask |= mask;
+  if (priv->mask)
+    {
+      fd->revents |= POLLIN;
+      nxsem_get_value(fd->sem, &semcnt);
+      if (semcnt < 1)
+        {
+          nxsem_post(fd->sem);
+        }
+
+      nxsem_get_value(&priv->wait, &semcnt);
+      if (semcnt < 1)
+        {
+          nxsem_post(&priv->wait);
+        }
+    }
+
+  nxsem_post(&priv->lock);
+
+  return OK;
+}
+
+/****************************************************************************
+ * Name: act8945a_open
+ *
+ * Description:
+ *   This function is called whenever the battery device is opened.
+ *
+ ****************************************************************************/
+
+static int act8945a_open(FAR struct file *filep)
+{
+  FAR struct act8945a_priv_s *priv;
+  FAR struct act8945a_dev_s *dev = filep->f_inode->i_private;
+  int ret;
+
+  priv = kmm_zalloc(sizeof(*priv));
+  if (priv == NULL)
+    {
+      return -ENOMEM;
+    }
+
+  ret = nxsem_wait(&dev->batsem);
+  if (ret < 0)
+    {
+      kmm_free(priv);
+      return ret;
+    }
+
+  nxsem_init(&priv->lock, 0, 1);
+  nxsem_init(&priv->wait, 0, 0);
+  nxsem_set_protocol(&priv->wait, SEM_PRIO_NONE);
+  list_add_tail(&dev->flist, &priv->node);
+  nxsem_post(&dev->batsem);
+  filep->f_priv = priv;
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: act8945a_close
+ *
+ * Description:
+ *   This routine is called when the battery device is closed.
+ *
+ ****************************************************************************/
+
+static int act8945a_close(FAR struct file *filep)
+{
+  FAR struct act8945a_priv_s *priv = filep->f_priv;
+  FAR struct act8945a_dev_s *dev = filep->f_inode->i_private;
+  int ret;
+
+  ret = nxsem_wait(&dev->batsem);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  list_delete(&priv->node);
+  nxsem_post(&dev->batsem);
+  nxsem_destroy(&priv->lock);
+  nxsem_destroy(&priv->wait);
+  kmm_free(priv);
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: act8945a_read
+ ****************************************************************************/
+
+static ssize_t act8945a_read(FAR struct file *filep, FAR char *buffer,
+                                size_t buflen)
+{
+  FAR struct act8945a_priv_s *priv = filep->f_priv;
+  int ret;
+
+  if (buflen < sizeof(priv->mask))
+    {
+      return -EINVAL;
+    }
+
+  ret = nxsem_wait(&priv->lock);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  while (priv->mask == 0)
+    {
+      nxsem_post(&priv->lock);
+      if (filep->f_oflags & O_NONBLOCK)
+        {
+          return -EAGAIN;
+        }
+
+      ret = nxsem_wait(&priv->wait);
+      if (ret < 0)
+        {
+          return ret;
+        }
+
+      ret = nxsem_wait(&priv->lock);
+      if (ret < 0)
+        {
+          return ret;
+        }
+    }
+
+  memcpy(buffer, &priv->mask, sizeof(priv->mask));
+  priv->mask = 0;
+
+  nxsem_post(&priv->lock);
+  return sizeof(priv->mask);
+}
+
+/****************************************************************************
+ * Name: act8945a_write
+ ****************************************************************************/
+
+static ssize_t act8945a_write(FAR struct file *filep,
+                                 FAR const char *buffer, size_t buflen)
+{
+  /* Return nothing written */
+
+  return 0;
+}
+
+/****************************************************************************
+ * Name: act8945a_ioctl
+ ****************************************************************************/
+
+static int act8945a_ioctl(FAR struct file *filep, int cmd,
+                             unsigned long arg)
+{
+  FAR struct inode *inode = filep->f_inode;
+  FAR struct act8945a_dev_s *dev  = inode->i_private;
+  int ret;
+
+  /* Enforce mutually exclusive access to the battery driver */
+
+  ret = nxsem_wait(&dev->batsem);
+  if (ret < 0)
+    {
+      return ret; /* Probably -EINTR */
+    }
+
+  /* Process the IOCTL command */
+
+  ret = -EINVAL;  /* Assume a bad argument */
+  switch (cmd)
+    {
+      case BATIOC_STATE:
+        {
+          FAR int *ptr = (FAR int *)((uintptr_t)arg);
+          if (ptr)
+            {
+              ret = dev->ops->state(dev, ptr);
+            }
+        }
+        break;
+
+      case BATIOC_HEALTH:
+        {
+          FAR int *ptr = (FAR int *)((uintptr_t)arg);
+          if (ptr)
+            {
+              ret = dev->ops->health(dev, ptr);
+            }
+        }
+        break;
+
+      case BATIOC_ONLINE:
+        {
+          FAR bool *ptr = (FAR bool *)((uintptr_t)arg);
+          if (ptr)
+            {
+              ret = dev->ops->online(dev, ptr);
+            }
+        }
+        break;
+
+      case BATIOC_VOLTAGE:
+        {
+          int volts;
+          FAR int *voltsp = (FAR int *)((uintptr_t)arg);
+          if (voltsp)
+            {
+              volts = *voltsp;
+              ret = dev->ops->voltage(dev, volts);
+            }
+        }
+        break;
+
+      case BATIOC_CURRENT:
+        {
+          int amps;
+          FAR int *ampsp = (FAR int *)((uintptr_t)arg);
+          if (ampsp)
+            {
+              amps = *ampsp;
+              ret = dev->ops->current(dev, amps);
+            }
+        }
+        break;
+
+      case BATIOC_INPUT_CURRENT:
+        {
+          int amps;
+          FAR int *ampsp = (FAR int *)((uintptr_t)arg);
+          if (ampsp)
+            {
+              amps = *ampsp;
+              ret = dev->ops->input_current(dev, amps);
+            }
+        }
+        break;
+
+      case BATIOC_OPERATE:
+        {
+          FAR int *ptr = (FAR int *)((uintptr_t)arg);
+          if (ptr)
+            {
+              ret = dev->ops->operate(dev, (uintptr_t)arg);
+            }
+        }
+        break;
+
+      case BATIOC_CHIPID:
+        {
+          FAR unsigned int *ptr = (FAR unsigned int *)((uintptr_t)arg);
+          if (ptr)
+            {
+              ret = dev->ops->chipid(dev, ptr);
+            }
+        }
+        break;
+
+      case BATIOC_GET_VOLTAGE:
+        {
+          FAR int *outvoltsp = (FAR int *)((uintptr_t)arg);
+          if (outvoltsp)
+            {
+              ret = dev->ops->get_voltage(dev, outvoltsp);
+            }
+        }
+        break;
+
+      default:
+        _err("ERROR: Unrecognized cmd: %d\n", cmd);
+        ret = -ENOTTY;
+        break;
+    }
+
+  nxsem_post(&dev->batsem);
+  return ret;
+}
+
+/****************************************************************************
+ * Name: act8945a_poll
+ ****************************************************************************/
+
+static ssize_t act8945a_poll(FAR struct file *filep,
+                                struct pollfd *fds, bool setup)
+{
+  FAR struct act8945a_priv_s *priv = filep->f_priv;
+  int ret;
+
+  ret = nxsem_wait(&priv->lock);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  if (setup)
+    {
+      if (priv->fds == NULL)
+        {
+          priv->fds = fds;
+          fds->priv = &priv->fds;
+        }
+      else
+        {
+          ret = -EBUSY;
+        }
+    }
+  else if (fds->priv != NULL)
+    {
+      priv->fds = NULL;
+      fds->priv = NULL;
+    }
+
+  nxsem_post(&priv->lock);
+
+  if (setup)
+    {
+      act8945a_notify(priv, 0);
+    }
+
+  return ret;
+}
+
 /****************************************************************************
  * Name: act8945a_getreg
  *
@@ -286,7 +717,7 @@ static int act8945a_enable_reg(FAR struct act8945a_dev_s *priv,
                                     enum act8945a_regulator regulator, bool enable)
 {
   int ret;
-  uint8_t regval = 0;
+  uint8_t regval;
   
   ret = act8945a_getreg(priv, reg_enable_register[regulator], &regval);
 
@@ -316,9 +747,60 @@ static int act8945a_enable_reg(FAR struct act8945a_dev_s *priv,
 
   ret = act8945a_putreg(priv, reg_enable_register[regulator], regval);
   return ret;
-  
+
 }
-                                      
+
+
+/***************************************************************************
+ * Name: act8945a_enable_lowiq
+ *
+ * Description:
+ *   Enable/disable the regulator LOWIQ mode as required
+ *   - only valid for regaultors 4,5,6 and 7
+ *   - when set to 1enables low power operating mode
+ *     NB: this decreases line regulation by x10
+ *
+ ***************************************************************************/
+static int act8945a_enable_lowiq(FAR struct act8945a_dev_s *priv,
+                                    enum act8945a_regulator regulator, bool enable)
+{
+  uint8_t regval;
+  int ret;
+  
+  if (regulator < REG4)
+    {
+      act8945a_err("WARN: Setting LOWIQ mode on unsupported regulator: %d\n",
+                   (regulator + 1));
+      return -EINVAL;
+    }
+
+  ret = act8945a_getreg(priv, reg_control_register[regulator], &regval);
+  if (ret < 0)
+    {
+      act8945a_err("ERR: failed to read register %d:\n",
+                    reg_control_register[regulator]); 
+      return -EIO;
+    }
+  if (enable)
+    {
+      /* we want to enable the LOW-IQ mode` */
+
+      regval &= ACT8945A_LOW_IQ_ENABLE;
+      act8945a_info("INFO: Setting regulator %d LOWIQ mode on\n",
+                    (regulator + 1));
+    }
+  else 
+    {
+      /* we want to disable the LOWIQ mode*/
+
+      regval |= ~ACT8945A_LOW_IQ_ENABLE;
+      act8945a_info("INFO: Setting regulator %d LOWIQ mode off\n",
+                    (regulator + 1));
+    }
+
+  return OK;//act8945a_putreg(priv, reg_control_register[regulator], regval);
+
+}                                      
 
 /****************************************************************************
  * Name: act8945a_set_reg_voltage
@@ -386,7 +868,6 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
                   uint32_t frequency)
 {
   FAR struct act8945a_dev_s *priv;
-  uint8_t                  chipid = 0;
 
   /* Initialize the act8945a device structure */
 
@@ -396,7 +877,7 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
     {
       /* Initialize the act8945a device structure */
 
-      priv->ops       = &g_act8945aops;
+      priv->ops       = &g_act8945a_ops; 
       priv->i2c       = i2c;
       priv->addr      = addr;
       priv->frequency = frequency;
@@ -461,7 +942,72 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
 #else
   act8945a_enable_reg(priv, REG7, false);
 #endif  
-  return (FAR struct battery_charger_dev_s *)priv;
+  return (FAR struct act8945a_dev_s *)priv;
 }
+#if 0
+/****************************************************************************
+ * Name: act8945a_changed
+ ****************************************************************************/
+
+int act8945a_changed(FAR struct act8945a_dev_s *dev,
+                             uint32_t mask)
+{
+  FAR struct act8945a_priv_s *priv;
+  int ret;
+
+  ret = nxsem_wait_uninterruptible(&dev->batsem);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  list_for_every_entry(&dev->flist, priv,
+                       struct act8945a_priv_s, node)
+    {
+      act8945a_notify(priv, mask);
+    }
+
+  nxsem_post(&dev->batsem);
+  return OK;
+}
+#endif
+/****************************************************************************
+ * Name: act8945a_register
+ *
+ * Description:
+ *   Register a lower half battery driver with the common, upper-half
+ *   battery driver.
+ *
+ * Input Parameters:
+ *   devpath - The location in the pseudo-filesystem to create the driver.
+ *     Recommended standard is "/dev/bat0", "/dev/bat1", etc.
+ *   dev - An instance of the battery state structure .
+ *
+ * Returned Value:
+ *    Zero on success or a negated errno value on failure.
+ *
+ ****************************************************************************/
+
+int act8945a_register(FAR const char *devpath,
+                      FAR struct battery_charger_dev_s *dev)
+{
+  int ret;
+
+  /* Initialize the semaphore and the list */
+
+  nxsem_init(&dev->batsem, 0, 1);
+  list_initialize(&dev->flist);
+
+  /* Register the character driver */
+
+  ret = register_driver(devpath, &g_batteryops, 0666, dev);
+  if (ret < 0)
+    {
+      _err("ERROR: Failed to register driver: %d\n", ret);
+    }
+
+  return ret;
+}
+
 
 #endif /* CONFIG_I2C && CONFIG_I2C_ACT8945A */

@@ -58,14 +58,30 @@
 
 #define ACT8945A_VSET_MASK                        (0x3f)
 
+#define ACT8945A_LOW_IQ_ENABLE                    (1 << 5)
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
+
+enum act8945a_interrupt
+{
+	CHARGE_STATE_OUT_EOC_STATE,
+	INPUT_VOLTAGE_OUT_VALID_RANGE,
+	BATTERY_TEMPERATURE_OUT_RANGE,
+	PRECHARGE_TIME_OUT,
+	CHARGE_STATE_INTO_EOC_STATE,
+	INPUT_VOLTAGE_INTO_VALID_RANGE,
+	BATTERY_TEMPERATURE_INTO_RANGE,
+	TOTAL_CHARGE_TIME_OUT,
+};
+  
 
 
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
+
 
 #if defined(CONFIG_I2C) && defined(CONFIG_I2C_ACT8945A)
 
@@ -80,6 +96,26 @@ FAR struct battery_charger_dev_s *act8945a_initialize(
                                      uint8_t addr,
                                      uint32_t frequency
                                      );
+
+/****************************************************************************
+ * Name: act8945a_register
+ *
+ * Description:
+ *   Register a lower half act8945a driver with the common, upper-half
+ *   battery driver.
+ *
+ * Input Parameters:
+ *   devpath - The location in the pseudo-filesystem to create the driver.
+ *     Recommended standard is "/dev/bat0", "/dev/bat1", etc.
+ *   dev - An instance of the battery state structure .
+ *
+ * Returned Value:
+ *    Zero on success or a negated errno value on failure.
+ *
+ ****************************************************************************/
+
+int act8945a_register(FAR const char *devpath,
+                      FAR struct battery_charger_dev_s *dev);
 
 #ifdef __cplusplus
 }
