@@ -129,23 +129,18 @@ static int lp503x_i2c_write_reg(FAR struct lp503x_dev_s *priv,
 static int lp503x_i2c_read_reg(FAR struct lp503x_dev_s *priv,
                                     uint8_t const reg_addr,
                                     uint8_t *regval);
-static int lp503x_set_led_mode(FAR struct lp503x_dev_s *priv,
-                                  uint8_t const led_out_x_mode);
-
 static int lp503x_open(FAR struct file *filep);
 static int lp503x_close(FAR struct file *filep);
 static int lp503x_ioctl(FAR struct file *filep, int cmd,
                            unsigned long arg);
 #ifdef CONFIG_DEBUG_LP503X
-static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
+static int lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
                                   FAR const char *msg);
 #else
 #  define lp503x_dump_registers(priv, msg);
 #endif 
 static int lp503x_reset(FAR struct lp503x_dev_s *priv);
 static int lp503x_enable(FAR struct lp503x_dev_s *priv, bool enable);
-static int lp503x_set_rgbled(FAR struct lp503x_dev_s *priv, int led,
-                             int colour);
 static int lp503x_set_rgbbrightness(FAR struct lp503x_dev_s *priv, int led,
                                     int brightness);
 static int lp503x_set_outcolour(FAR struct lp503x_dev_s *priv, int led,
@@ -194,7 +189,7 @@ static const struct file_operations g_lp503x_fileops =
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_LP503X
-static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
+static int lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
                                   FAR const char *msg)
 {
   uint8_t val1;
@@ -328,6 +323,8 @@ static void lp503x_dump_registers(FAR struct lp503x_dev_s *priv,
     ("Out28 Col:\t%02x Out29 Col:\t%02x \
     Out30 Col:\t%02x  Out31 Col:\t %02x\n",
     val1, val2, val3, val4);
+  
+  return ret;
 }
 
 #endif
@@ -492,10 +489,7 @@ static int lp503x_close(FAR struct file *filep)
 
 static int lp503x_reset(FAR struct lp503x_dev_s *priv)
 {
-  FAR struct lp503x_config_s *config;
   int ret;
-
-  config = priv->lp503x_config;
 
   ret = lp503x_i2c_write_reg(priv, LP503X_RESET, LP503X_RESET_ALL_REGISTERS);
   if (ret != 0)
@@ -615,8 +609,6 @@ static int lp503x_set_config(FAR struct lp503x_dev_s *priv)
 static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv,
                                       int brightness)
 {
-  int ret;
-
   if (brightness > MAX_BRIGHTNESS)
     {
       return -EINVAL;
@@ -638,8 +630,6 @@ static int lp503x_set_bank_brightness(FAR struct lp503x_dev_s *priv,
 static int lp503x_set_bank_colour(FAR struct lp503x_dev_s *priv, char bank,
                                   int brightness)
 {
-  int ret;
-
   if (brightness > MAX_BRIGHTNESS)
     {
       return -EINVAL;
@@ -719,7 +709,7 @@ static int lp503x_set_bank_mode(FAR struct lp503x_dev_s *priv)
 }
 
 /****************************************************************************
- * Name: lp503x_set_rgbled
+ * Name: lp503x_set_rgbled_colour
  *
  * Description:
  *   sets RGB led to chosen html colour
@@ -818,12 +808,11 @@ static int lp503x_ioctl(FAR struct file *filep, int cmd,
   FAR struct lp503x_dev_s *priv = inode->i_private;
   FAR struct lp503x_config_s *config;
   int ret;
-  int regval;
-  FAR const struct ioctl_arg_s *lp503x_ioctl_args;
+  FAR const struct ioctl_arg_s *lp503x_ioctl_args = (FAR struct ioctl_arg_s *) arg;
 
   config = priv->lp503x_config;
 
-  lp503x_ioctl_args = arg;
+  //lp503x_ioctl_args = (FAR struct ioctl_arg_s *) arg;
 
   ret = OK;
 
@@ -940,15 +929,12 @@ int lp503x_register(FAR const char *devpath, FAR struct i2c_master_s *i2c,
   FAR struct lp503x_dev_s *priv =
     (FAR struct lp503x_dev_s *)kmm_malloc(sizeof(struct lp503x_dev_s));
 
-  FAR struct lp503x_config_s *config;
-
   if (priv == NULL)
     {
       lederr("ERROR: Failed to allocate instance of lp503x_dev_s\n");
       return -ENOMEM;
     }
 
-  config = priv->lp503x_config;
   priv->i2c = i2c;
   priv->i2c_addr = lp503x_i2c_addr;
 
