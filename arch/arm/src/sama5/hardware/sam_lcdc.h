@@ -56,6 +56,7 @@
 #  define SAM_LCDC_LCDATTR_OFFSET   0x003c /* LCD Controller Attribute Register */
 #endif
 
+
 #define SAM_LCDC_BASECHER_OFFSET    0x0040 /* Base Layer Channel Enable Register */
 #define SAM_LCDC_BASECHDR_OFFSET    0x0044 /* Base Layer Channel Disable Register */
 #define SAM_LCDC_BASECHSR_OFFSET    0x0048 /* Base Layer Channel Status Register */
@@ -482,14 +483,14 @@
 
 /* LCD Controller Configuration Register 1 */
 
-#if defined(ATSAMA5D3)
+#if defined(ATSAMA5D2) || defined(ATSAMA5D3)
 #  define LCDC_LCDCFG1_HSPW_SHIFT   (0)       /* Bits 0-5: Horizontal Sync Pulse Width */
 #  define LCDC_LCDCFG1_HSPW_MASK    (0x3f << LCDC_LCDCFG1_HSPW_SHIFT)
 #    define LCDC_LCDCFG1_HSPW(n)    ((uint32_t)(n) << LCDC_LCDCFG1_HSPW_SHIFT)
 #  define LCDC_LCDCFG1_VSPW_SHIFT   (16)      /* Bits 16-21: Vertical Sync Pulse Width */
 #  define LCDC_LCDCFG1_VSPW_MASK    (0x3f << LCDC_LCDCFG1_VSPW_SHIFT)
 #    define LCDC_LCDCFG1_VSPW(n)    ((uint32_t)(n) << LCDC_LCDCFG1_VSPW_SHIFT)
-#elif defined(ATSAMA5D4)
+#elif defined (ATSAMA5D4)
 #  define LCDC_LCDCFG1_HSPW_SHIFT   (0)       /* Bits 0-7: Horizontal Sync Pulse Width */
 #  define LCDC_LCDCFG1_HSPW_MASK    (0xff << LCDC_LCDCFG1_HSPW_SHIFT)
 #    define LCDC_LCDCFG1_HSPW(n)    ((uint32_t)(n) << LCDC_LCDCFG1_HSPW_SHIFT)
@@ -499,15 +500,14 @@
 #endif
 
 /* LCD Controller Configuration Register 2 */
-
-#if defined(ATSAMA5D3)
+#if defined(ATSAMA5D2) || defined(ATSAMA5D3)
 #  define LCDC_LCDCFG2_VFPW_SHIFT   (0)       /* Bits 0-5: Vertical Front Porch Width */
 #  define LCDC_LCDCFG2_VFPW_MASK    (0x3f << LCDC_LCDCFG2_VFPW_SHIFT)
 #    define LCDC_LCDCFG2_VFPW(n)    ((uint32_t)(n) << LCDC_LCDCFG2_VFPW_SHIFT)
 #  define LCDC_LCDCFG2_VBPW_SHIFT   (16)      /* Bits 16-21: Vertical Back Porch Width */
 #  define LCDC_LCDCFG2_VBPW_MASK    (0x3f << LCDC_LCDCFG2_VBPW_SHIFT)
 #    define LCDC_LCDCFG2_VBPW(n)    ((uint32_t)(n) << LCDC_LCDCFG2_VBPW_SHIFT)
-#elif defined(ATSAMA5D4)
+#elif defined (ATSAMA5D4)
 #  define LCDC_LCDCFG2_VFPW_SHIFT   (0)       /* Bits 0-7: Vertical Front Porch Width */
 #  define LCDC_LCDCFG2_VFPW_MASK    (0xff << LCDC_LCDCFG2_VFPW_SHIFT)
 #    define LCDC_LCDCFG2_VFPW(n)    ((uint32_t)(n) << LCDC_LCDCFG2_VFPW_SHIFT)
@@ -517,15 +517,14 @@
 #endif
 
 /* LCD Controller Configuration Register 3 */
-
-#if defined(ATSAMA5D3)
+#if defined(ATSAMA5D2) || defined(ATSAMA5D3)
 #  define LCDC_LCDCFG3_HFPW_SHIFT   (0)       /* Bits 0-8: Horizontal Front Porch Width */
 #  define LCDC_LCDCFG3_HFPW_MASK    (0x1ff << LCDC_LCDCFG3_HFPW_SHIFT)
 #    define LCDC_LCDCFG3_HFPW(n)    ((uint32_t)(n) << LCDC_LCDCFG3_HFPW_SHIFT)
 #  define LCDC_LCDCFG3_HBPW_SHIFT   (16)      /* Bits 16-24: Horizontal Back Porch Width */
 #  define LCDC_LCDCFG3_HBPW_MASK    (0x1ff << LCDC_LCDCFG3_HBPW_SHIFT)
 #    define LCDC_LCDCFG3_HBPW(n)    ((uint32_t)(n) << LCDC_LCDCFG3_HBPW_SHIFT)
-#elif defined(ATSAMA5D4)
+#elif defined (ATSAMA5D4)
 #  define LCDC_LCDCFG3_HFPW_SHIFT   (0)       /* Bits 0-9: Horizontal Front Porch Width */
 #  define LCDC_LCDCFG3_HFPW_MASK    (0x3ff << LCDC_LCDCFG3_HFPW_SHIFT)
 #    define LCDC_LCDCFG3_HFPW(n)    ((uint32_t)(n) << LCDC_LCDCFG3_HFPW_SHIFT)
@@ -559,18 +558,22 @@
 #  define LCDC_LCDCFG5_MODE_18BPP   (2 << LCDC_LCDCFG5_MODE_SHIFT) /* Output mode 18 bits per pixel */
 #  define LCDC_LCDCFG5_MODE_24BPP   (3 << LCDC_LCDCFG5_MODE_SHIFT) /* Output mode 24 bits per pixel */
 
-#ifdef ATSAMA5D3
+#if defined(ATSAMA5D2) || defined(ATSAMA5D3)
 #  define LCDC_LCDCFG5_PP           (1 << 10) /* Bit 10: Post Processing Enable */
 #endif
 
 #define LCDC_LCDCFG5_VSPSU          (1 << 12) /* Bit 12: LCDC VSync Pulse Setup Configuration */
 #define LCDC_LCDCFG5_VSPHO          (1 << 13) /* Bit 13: LCDC VSync Pulse Hold Configuration */
 
-#if defined(ATSAMA5D3)
+#if defined (ATSAMA5D2)
+#  define LCDC_LCDCFG5_GUARDTIME_SHIFT (16)     /* Bits 16-23: LCD DISPLAY Guard Time */
+#  define LCDC_LCDCFG5_GUARDTIME_MASK  (0xff << LCDC_LCDCFG5_GUARDTIME_SHIFT)
+#    define LCDC_LCDCFG5_GUARDTIME(n)  ((uint32_t)(n) << LCDC_LCDCFG5_GUARDTIME_SHIFT)
+#elif defined (ATSAMA5D3)
 #  define LCDC_LCDCFG5_GUARDTIME_SHIFT (16)     /* Bits 16-20: LCD DISPLAY Guard Time */
 #  define LCDC_LCDCFG5_GUARDTIME_MASK  (0x1f << LCDC_LCDCFG5_GUARDTIME_SHIFT)
 #    define LCDC_LCDCFG5_GUARDTIME(n)  ((uint32_t)(n) << LCDC_LCDCFG5_GUARDTIME_SHIFT)
-#elif defined(ATSAMA5D4)
+#elif defined (ATSAMA5D4)
 #  define LCDC_LCDCFG5_GUARDTIME_SHIFT (16)     /* Bits 16-23: LCD DISPLAY Guard Time */
 #  define LCDC_LCDCFG5_GUARDTIME_MASK  (0xff << LCDC_LCDCFG5_GUARDTIME_SHIFT)
 #    define LCDC_LCDCFG5_GUARDTIME(n)  ((uint32_t)(n) << LCDC_LCDCFG5_GUARDTIME_SHIFT)
@@ -634,15 +637,30 @@
 #define LCDC_LCDINT_OVR2            (1 << 10) /* Bit 10: Overlay 2 Raw Interrupt */
 #define LCDC_LCDINT_HEO             (1 << 11) /* Bit 11: High End Overlay Raw Interrupt */
 
-#if defined(ATSAMA5D3)
+#if defined (ATSAMA5D2)
+#  define LCDC_LCDINT_ALL           (0x00002f17)
+#  define LCDC_LCDINT_PP            (1 << 13) /* Bit 13: Post Processing Raw Interrupt */
+#elif defined (ATSAMA5D3)
 #  define LCDC_LCDINT_HCR           (1 << 12) /* Bit 12: Hardware Cursor Raw Interrupt */
 #  define LCDC_LCDINT_PP            (1 << 13) /* Bit 13: Post Processing Raw Interrupt */
 #  define LCDC_LCDINT_ALL           (0x00003f17)
-#elif defined(ATSAMA5D4)
+#elif defined (ATSAMA5D4)
 #  define LCDC_LCDINT_ALL           (0x00000f17)
 #endif
 
-#ifdef ATSAMA5D4
+#if defined (ATSAMA5D2)
+/* LCD Controller Attribute Register */
+#  define LCDC_LCDATTR_BASE         (1 << 0)  /* Bit 0:  Base Layer Update Attribute Register */
+#  define LCDC_LCDATTR_OVR1         (1 << 1)  /* Bit 1:  Overlay 1 Update Attribute Register */
+#  define LCDC_LCDATTR_OVR2         (1 << 2)  /* Bit 2:  Overlay 2 Update Attribute Register */
+#  define LCDC_LCDATTR_HEO          (1 << 3)  /* Bit 3:  High-End Overlay Update Attribute Register */
+#  define LCDC_LCDATTR_PP           (1 << 5)  /* Bit 13:  Post Processing Update Attribute Register */
+#  define LCDC_LCDATTR_BASEA2Q      (1 << 8)  /* Bit 8:  Base Layer Update Attribute Register */
+#  define LCDC_LCDATTR_OVR1A2Q      (1 << 9)  /* Bit 9:  Overlay 1 Update Attribute Register */
+#  define LCDC_LCDATTR_OVR2A2Q      (1 << 10) /* Bit 10: Overlay 2 Update Attribute Register */
+#  define LCDC_LCDATTR_HEOA2Q       (1 << 11) /* Bit 11: High-End Overlay Update Attribute Register */
+#  define LCDC_LCDATTR_PPA2Q        (1 << 13) /* Bit 13: Post Processing Update Attribute Register */
+#elif ATSAMA5D4
 /* LCD Controller Attribute Register */
 
 #  define LCDC_LCDATTR_BASE         (1 << 0)  /* Bit 0:  Base Layer Update Attribute Register */
