@@ -120,7 +120,7 @@ config LP503X_DITHER_MODE
     Enable/disable PWM dithering mode
     
 config LP503X_MAX_CURRENT
-  bool "enable Max current option (25.5mA (n), or 35mA (y))
+  bool "enable Max current option (25.5mA (n), or 35mA (y))"
     default n
     ---help---
       Sets maximum output current to 25.5mA (default) or 35mA

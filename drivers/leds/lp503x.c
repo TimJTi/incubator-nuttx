@@ -62,6 +62,7 @@ struct lp503x_dev_s
 {
   FAR struct  i2c_master_s    *i2c;
   uint8_t                     i2c_addr;
+  int                         i2c_freq;
   int                         count;
 
   /* device configuration/setup data */
@@ -353,8 +354,9 @@ static int lp503x_i2c_write_reg(FAR struct lp503x_dev_s *priv,
 
   /* Setup up the I2C configuration */
 
-  config.frequency = LP503X_I2C_BUS_FREQ_HZ;
+  config.frequency = priv->i2c_freq;
   config.address   = priv->i2c_addr;
+
   config.addrlen   = 7;
 
   /* Write the register address followed by the data (no RESTART) */
@@ -389,7 +391,7 @@ static int lp503x_i2c_read_reg(FAR struct lp503x_dev_s *priv,
 
   /* Setup up the I2C configuration */
 
-  config.frequency = LP503X_I2C_BUS_FREQ_HZ;
+  config.frequency = priv->i2c_freq;
   config.address   = priv->i2c_addr;
   config.addrlen   = 7;
 
@@ -916,7 +918,7 @@ static int lp503x_ioctl(FAR struct file *filep, int cmd,
  ****************************************************************************/
 
 int lp503x_register(FAR const char *devpath, FAR struct i2c_master_s *i2c,
-                       uint8_t const lp503x_i2c_addr)
+                       uint8_t const lp503x_i2c_addr, int const i2c_frequency)
 {
   int ret;
 
@@ -935,8 +937,10 @@ int lp503x_register(FAR const char *devpath, FAR struct i2c_master_s *i2c,
       return -ENOMEM;
     }
 
-  priv->i2c = i2c;
-  priv->i2c_addr = lp503x_i2c_addr;
+  priv->i2c           = i2c;
+  priv->i2c_addr      = lp503x_i2c_addr;
+  priv->i2c_freq      = i2c_frequency;
+  //priv->i2c_frequency = lp503x_i2c_freq; 
 
   priv->state = LP503X_STATE_UNINIT;
 

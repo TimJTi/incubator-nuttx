@@ -254,7 +254,7 @@ extern "C"
  ****************************************************************************/
 
 int lp503x_register(FAR const char *devpath, FAR struct i2c_master_s *i2c,
-                       uint8_t const lp503x_i2c_addr);
+                       uint8_t const lp503x_i2c_addr, int const i2c_frequency);
 
 #undef EXTERN
 #ifdef __cplusplus

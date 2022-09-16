@@ -35,8 +35,7 @@
 #include <nuttx/fs/fs.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/i2c/i2c_master.h>
-#include <nuttx/power/battery_charger.h>
-#include <nuttx/power/battery_ioctl.h>
+#include <nuttx/power/regulator.h>
 #include <nuttx/power/act8945a.h>
 
 #if defined(CONFIG_I2C) && defined(CONFIG_I2C_ACT8945A)
@@ -112,11 +111,7 @@
  ****************************************************************************/
 struct act8945a_priv_s
 {
-  struct list_node  node;
-  sem_t             lock;
-  sem_t             wait;
-  uint32_t          mask;
-  FAR struct pollfd *fds;
+  FAR struct regulator_dev_s *rdev;
 };
 
 struct act8945a_dev_s
@@ -124,7 +119,10 @@ struct act8945a_dev_s
   /* The common part of the battery driver visible to the upper-half driver */
   /* Fields required by the upper-half driver */
 
-  FAR const struct battery_charger_operations_s *ops; /* Battery operations */
+  FAR const struct regulator_ops_s g_act8945a_ops ; /* Battery operations */
+  FAR struct  i2c_master_s    *i2c;
+  uint8_t                     i2c_addr;
+  int                         i2c_freq;
 
   sem_t batsem;  /* Enforce mutually exclusive access */
 
@@ -137,6 +135,18 @@ struct act8945a_dev_s
   FAR struct i2c_master_s *i2c;       /* I2C interface */
   uint8_t                  addr;      /* I2C address */
   uint32_t                 frequency; /* I2C frequency */
+};
+
+static const struct regulator_ops_s *g_act8945a_ops =
+{
+  regulator_act8945a_list_voltage,    /* list_voltage */
+  regulator_act8945a_set_voltage,     /* set_voltage */
+  regulator_act8945a_set_voltage_sel, /* set_voltage_sel */
+  regulator_act8945a_set_voltage,     /* get_voltage */
+  regulator_act8945a_get_voltage_sel, /* get_voltage_sel */
+  regulator_act8945a_enable,          /* enable */
+  regulator_act8945a_is_enabled,      /* is_enabled */
+  regulator_act8945a_disable          /* disable */
 };
 
 enum act8945a_regulator
@@ -868,6 +878,7 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
                   uint32_t frequency)
 {
   FAR struct act8945a_dev_s *priv;
+  int ret;
 
   /* Initialize the act8945a device structure */
 
@@ -883,18 +894,18 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
       priv->frequency = frequency;
     }
 
-  /*
-  act8945a_getreg(priv, ACT8945A_REG2, &chipid);
 
-  if (ACT8945A_CHIP_ID != chipid)
+
+  /* Initialise regulators */
+
+  ret = act8945a_set_reg_voltage(priv, REG1, CONFIG_ACT8945A_REG1_VOLTAGE);
+
+  /* if we failed to write, must be a device problem si quit now*/
+  if (ret < 0)
     {
       kmm_free(priv);
       return NULL;
     }
-  */
-  /* Initialise regulators */
-
-  act8945a_set_reg_voltage(priv, REG1, CONFIG_ACT8945A_REG1_VOLTAGE);
 #ifdef CONFIG_ACT8945A_REG1_ENABLE
   act8945a_enable_reg(priv, REG1, true);
 #else
@@ -941,7 +952,7 @@ act8945a_initialize(FAR struct i2c_master_s *i2c, uint8_t addr,
   act8945a_enable_reg(priv, REG7, true);
 #else
   act8945a_enable_reg(priv, REG7, false);
-#endif  
+#endif
   return (FAR struct act8945a_dev_s *)priv;
 }
 #if 0
@@ -1005,6 +1016,7 @@ int act8945a_register(FAR const char *devpath,
     {
       _err("ERROR: Failed to register driver: %d\n", ret);
     }
+  
 
   return ret;
 }
