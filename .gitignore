@@ -103,3 +103,4 @@ lp503x.h.errors.txt
 .config-while-trying-to-sort-the-mess
 .config_10.3-porting
 drivers/power/act8945a.c_deprecated
+.config_10.3-porting
