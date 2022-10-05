@@ -100,3 +100,6 @@ boards/arm/sama5/jti-toucan2-deprecated/src/sam_usbmsc.c
 lp503x.app.errors.txt
 lp503x.c.errors.txt
 lp503x.h.errors.txt
+.config-while-trying-to-sort-the-mess
+.config_10.3-porting
+drivers/power/act8945a.c_deprecated
