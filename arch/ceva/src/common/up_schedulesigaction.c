@@ -74,7 +74,7 @@
 
 void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
 {
-  sinfo("tcb=0x%p sigdeliver=0x%p\n", tcb, sigdeliver);
+  sinfo("tcb=%p sigdeliver=%p\n", tcb, sigdeliver);
   DEBUGASSERT(tcb != NULL && sigdeliver != NULL);
 
   /* Refuse to handle nested signal actions */
@@ -85,7 +85,7 @@ void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
        * to task that is currently executing on any CPU.
        */
 
-      sinfo("rtcb=0x%p CURRENT_REGS=0x%p\n", this_task(), CURRENT_REGS);
+      sinfo("rtcb=%p CURRENT_REGS=%p\n", this_task(), CURRENT_REGS);
 
       if (tcb->task_state == TSTATE_TASK_RUNNING)
         {
@@ -141,7 +141,7 @@ void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
               /* Save the current register context location */
 
               tcb->xcp.saved_regs = g_current_regs[cpu];
-              tcb->xcp.sigdeliver = (FAR void *)sigdeliver;
+              tcb->xcp.sigdeliver = (void *)sigdeliver;
 
               /* Duplicate the register context.  These will be
                * restored by the signal trampoline after the signal has been
@@ -186,7 +186,7 @@ void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
           /* Save the current register context location */
 
           tcb->xcp.saved_regs = tcb->xcp.regs;
-          tcb->xcp.sigdeliver = (FAR void *)sigdeliver;
+          tcb->xcp.sigdeliver = (void *)sigdeliver;
 
           /* Duplicate the register context.  These will be restored
            * by the signal trampoline after the signal has been delivered.

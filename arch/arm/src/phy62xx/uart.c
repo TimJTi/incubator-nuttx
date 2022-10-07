@@ -346,12 +346,12 @@ int hal_uart_txint_en(UART_INDEX_e uart_index, bool en)
   return 0;
 }
 
-extern uint32_t sysclk_get_clk(void);
+extern uint32_t timer_sysclk_get_clk(void);
 
 int uart_hw_init(UART_INDEX_e uart_index)
 {
   uart_Cfg_t *pcfg;
-  int pclk = sysclk_get_clk();
+  int pclk = timer_sysclk_get_clk();
   uint32_t dll;
   AP_UART_TypeDef *cur_uart = AP_UART0;
   MODULE_e mod = MOD_UART0;
@@ -619,7 +619,7 @@ int hal_uart_send_byte(UART_INDEX_e uart_index, unsigned char data)
   return PPlus_SUCCESS;
 }
 
-static int pplus_uart_interrupt(int irq, void *context, FAR void *arg);
+static int pplus_uart_interrupt(int irq, void *context, void *arg);
 
 static int pplus_uart_setup(struct uart_dev_s *dev)
 {
@@ -735,7 +735,7 @@ static void pplus_uart_detach(struct uart_dev_s *dev)
  *
  ****************************************************************************/
 
-static int pplus_uart_interrupt(int irq, void *context, FAR void *arg)
+static int pplus_uart_interrupt(int irq, void *context, void *arg)
 {
   struct uart_dev_s *dev = (struct uart_dev_s *)arg;
   uart_Ctx_t *priv = (uart_Ctx_t *)(dev->priv);
@@ -1156,7 +1156,7 @@ void h4uart_rx_irq(void *arg)
         }
 
       circbuf_write(param->pcirc_h2c, buf, len);
-      sem_post(param->psem_h2c);
+      nxsem_post(param->psem_h2c);
     }
 }
 
@@ -1185,7 +1185,7 @@ void h4uart_tx_irq(void *arg)
     }
 }
 
-static int h4uart_interrupt(int irq, void *context, FAR void *arg)
+static int h4uart_interrupt(int irq, void *context, void *arg)
 {
   AP_UART_TypeDef *preg = AP_UART1;
 
@@ -1202,7 +1202,7 @@ static int h4uart_interrupt(int irq, void *context, FAR void *arg)
           break;
       case RLS_IRQ:
       case BUSY_IRQ:
-          (void)preg->USR;
+          preg->USR;
           break;
       default:
           break;

@@ -40,6 +40,16 @@ config ALLOW_GPL_COMPONENTS
 		NOTE: Please check that the license for each enabled
 		component matches your project license.
 
+config ALLOW_MIT_COMPONENTS
+	bool "Use components that have MIT licenses"
+	default n
+	---help---
+		When this option is enabled the project will allow the use
+		of components that have MIT licenses.
+
+		NOTE: Please check that the license for each enabled
+		component matches your project license.
+
 config ALLOW_BSDNORDIC_COMPONENTS
 	bool "Use components that have 5-Clause Nordic licenses"
 	depends on ARCH_CHIP_NRF52
@@ -559,7 +569,7 @@ menu "Debug Options"
 
 config NDEBUG
 	bool "Define NDEBUG globally"
-	default y
+	default !DEBUG_ASSERTIONS
 
 config DEBUG_ALERT
 	bool
@@ -1220,7 +1230,7 @@ endif # DEBUG_LCD
 config DEBUG_LEDS
 	bool "Low-level LED Debug Features"
 	default n
-	depends on ARCH_HAVE_LEDS
+	depends on ARCH_HAVE_LEDS || WS2812
 	---help---
 		Enable LED driver debug features.
 
@@ -1892,7 +1902,7 @@ config DEBUG_TCBINFO
 	bool "Enable TCBinfo struct for debug"
 	default n
 	---help---
-		Enables tcbinfo struct for debugger infomation.
+		Enables tcbinfo struct for debugger information.
 		Selecting this option will enable g_tcbinfo in arch and
 		procfs.
 
@@ -1989,6 +1999,28 @@ config DEBUG_OPTLEVEL
 	---help---
 		This string represents the custom optimization level that will be
 		used if DEBUG_CUSTOMOPT.
+
+config DEBUG_OPT_UNUSED_SECTIONS
+	bool "Optimization to eliminate the unused input sections"
+	default y
+	depends on ARCH_TOOLCHAIN_GNU
+	---help---
+		Use these options on systems where the linker can perform optimizations
+		to improve locality of reference in the instruction space.  Most systems
+		using the ELF object format have linkers with such optimizations.
+
+		Enable this option to optimization the unused input sections with the
+		linker by compiling with " -ffunction-sections -fdata-sections ", and
+		linking with " --gc-sections ".
+
+config DEBUG_LINK_MAP
+	bool "Generate link map file"
+	default y
+	---help---
+		Selecting this option will pass "-Map=$(TOPDIR)$(DELIM)nuttx.map" to ld
+		when linking NuttX ELF. That file can be useful for verifying
+		and debugging magic section games, and for seeing which
+		pieces of code get eliminated with DEBUG_OPT_UNUSED_SECTIONS.
 
 endmenu # Build Setup
 

@@ -955,9 +955,9 @@ nxwm
         /* Execute the startup script */
 
       #ifdef CONFIG_NSH_ROMFSETC
-     -  (void)nsh_script(&pstate->cn_vtbl, "init", NSH_INITPATH);
+     -  nsh_script(&pstate->cn_vtbl, "init", NSH_INITPATH);
      +// REMOVE ME
-     +//  (void)nsh_script(&pstate->cn_vtbl, "init", NSH_INITPATH);
+     +//  nsh_script(&pstate->cn_vtbl, "init", NSH_INITPATH);
       #endif
 
         /* Then enter the command line parsing loop */
@@ -1382,7 +1382,7 @@ ustream
 vncserver
 
   This a simple vnc server test configuration, Remmina is tested and recommended since
-  there are some compatibility issues. By defualt SIM will be blocked at startup to
+  there are some compatibility issues. By default SIM will be blocked at startup to
   wait client connection, if a client connected, then the fb example will launch. 
 
 vpnkit

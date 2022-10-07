@@ -473,6 +473,28 @@ FAR struct udp_wrbuffer_s *udp_wrbuffer_alloc(void);
 #endif /* CONFIG_NET_UDP_WRITE_BUFFERS */
 
 /****************************************************************************
+ * Name: udp_wrbuffer_timedalloc
+ *
+ * Description:
+ *   Allocate a UDP write buffer by taking a pre-allocated buffer from
+ *   the free list.  This function is called from udp logic when a buffer
+ *   of udp data is about to sent
+ *   This function is wrapped version of udp_wrbuffer_alloc(),
+ *   this wait will be terminated when the specified timeout expires.
+ *
+ * Input Parameters:
+ *   timeout   - The relative time to wait until a timeout is declared.
+ *
+ * Assumptions:
+ *   Called from user logic with the network locked.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_NET_UDP_WRITE_BUFFERS
+FAR struct udp_wrbuffer_s *udp_wrbuffer_timedalloc(unsigned int timeout);
+#endif /* CONFIG_NET_UDP_WRITE_BUFFERS */
+
+/****************************************************************************
  * Name: udp_wrbuffer_tryalloc
  *
  * Description:
@@ -509,6 +531,24 @@ FAR struct udp_wrbuffer_s *udp_wrbuffer_tryalloc(void);
 #ifdef CONFIG_NET_UDP_WRITE_BUFFERS
 void udp_wrbuffer_release(FAR struct udp_wrbuffer_s *wrb);
 #endif /* CONFIG_NET_UDP_WRITE_BUFFERS */
+
+/****************************************************************************
+ * Name: udp_wrbuffer_inqueue_size
+ *
+ * Description:
+ *   Get the in-queued write buffer size from connection
+ *
+ * Input Parameters:
+ *   conn - The UDP connection of interest
+ *
+ * Assumptions:
+ *   Called from user logic with the network locked.
+ *
+ ****************************************************************************/
+
+#if CONFIG_NET_SEND_BUFSIZE > 0
+uint32_t udp_wrbuffer_inqueue_size(FAR struct udp_conn_s *conn);
+#endif /* CONFIG_NET_SEND_BUFSIZE */
 
 /****************************************************************************
  * Name: udp_wrbuffer_test
@@ -814,13 +854,12 @@ int udp_writebuffer_notifier_setup(worker_t worker,
  *         udp_readahead_notifier_setup().
  *
  * Returned Value:
- *   Zero (OK) is returned on success; a negated errno value is returned on
- *   any failure.
+ *   None.
  *
  ****************************************************************************/
 
 #ifdef CONFIG_NET_UDP_NOTIFIER
-int udp_notifier_teardown(int key);
+void udp_notifier_teardown(int key);
 #endif
 
 /****************************************************************************

@@ -5,7 +5,6 @@
 # You can then do "make savedefconfig" to generate a new defconfig file that includes your
 # modifications.
 #
-# CONFIG_ARCH_FPU is not set
 # CONFIG_DISABLE_OS_API is not set
 # CONFIG_NSH_DISABLE_LOSMART is not set
 # CONFIG_SPI_CALLBACK is not set
@@ -40,7 +39,6 @@ CONFIG_IDLETHREAD_STACKSIZE=2048
 CONFIG_INIT_ENTRYPOINT="nsh_main"
 CONFIG_INIT_STACKSIZE=3072
 CONFIG_INTELHEX_BINARY=y
-CONFIG_LIBC_FLOATINGPOINT=y
 CONFIG_LIBC_PERROR_STDOUT=y
 CONFIG_LIBC_STRERROR=y
 CONFIG_MEMSET_64BIT=y

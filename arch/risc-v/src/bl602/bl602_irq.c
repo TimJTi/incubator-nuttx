@@ -30,15 +30,18 @@
 #include <debug.h>
 
 #include <nuttx/arch.h>
-#include <nuttx/board.h>
-#include <arch/irq.h>
-#include <arch/board/board.h>
-#include <arch/csr.h>
+#include <nuttx/irq.h>
 
 #include "riscv_internal.h"
 #include "hardware/bl602_clic.h"
 
 #include "chip.h"
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+volatile uintptr_t *g_current_regs[1];
 
 /****************************************************************************
  * Private Functions
@@ -89,9 +92,9 @@ void up_irqinitialize(void)
 
   CURRENT_REGS = NULL;
 
-  /* Attach the ecall interrupt handler */
+  /* Attach the common interrupt handler */
 
-  irq_attach(RISCV_IRQ_ECALLM, riscv_swint, NULL);
+  riscv_exception_attach();
 
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
 
@@ -161,27 +164,6 @@ void up_enable_irq(int irq)
       ASSERT(irq < 64 + 16 + RISCV_IRQ_ASYNC);
       bl_irq_enable(irq - RISCV_IRQ_ASYNC);
     }
-}
-
-/****************************************************************************
- * Name: riscv_get_newintctx
- *
- * Description:
- *   Return initial mstatus when a task is created.
- *
- ****************************************************************************/
-
-uint32_t riscv_get_newintctx(void)
-{
-  /* Set machine previous privilege mode to machine mode.
-   * Also set machine previous interrupt enable
-   */
-
-#ifdef CONFIG_ARCH_FPU
-  return (MSTATUS_FS_INIT | MSTATUS_MPPM | MSTATUS_MPIE);
-#else
-  return (MSTATUS_MPPM | MSTATUS_MPIE);
-#endif
 }
 
 /****************************************************************************

@@ -25,14 +25,16 @@
 #include <nuttx/crypto/crypto.h>
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/fs/loop.h>
+#include <nuttx/input/uinput.h>
 #include <nuttx/net/loopback.h>
 #include <nuttx/net/tun.h>
 #include <nuttx/net/telnet.h>
 #include <nuttx/note/note_driver.h>
 #include <nuttx/power/pm.h>
+#include <nuttx/sensors/sensor.h>
+#include <nuttx/serial/pty.h>
 #include <nuttx/syslog/syslog.h>
 #include <nuttx/syslog/syslog_console.h>
-#include <nuttx/serial/pty.h>
 
 /****************************************************************************
  * Public Functions
@@ -53,12 +55,6 @@
 
 void drivers_initialize(void)
 {
-#ifdef CONFIG_PM
-  /* Initialize power management subsystem proper */
-
-  pm_initialize();
-#endif
-
   /* Register devices */
 
   syslog_initialize();
@@ -119,6 +115,18 @@ void drivers_initialize(void)
   devcrypto_register();
 #endif
 
+#ifdef CONFIG_UINPUT_TOUCH
+  uinput_touch_initialize();
+#endif
+
+#ifdef CONFIG_UINPUT_BUTTONS
+  uinput_button_initialize();
+#endif
+
+#ifdef CONFIG_UINPUT_KEYBOARD
+  uinput_keyboard_initialize();
+#endif
+
 #ifdef CONFIG_NET_LOOPBACK
   /* Initialize the local loopback device */
 
@@ -135,5 +143,13 @@ void drivers_initialize(void)
   /* Initialize the Telnet session factory */
 
   telnet_initialize();
+#endif
+
+#ifdef CONFIG_USENSOR
+  usensor_initialize();
+#endif
+
+#ifdef CONFIG_SENSORS_RPMSG
+  sensor_rpmsg_initialize();
 #endif
 }

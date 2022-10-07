@@ -38,11 +38,11 @@
 #include <nuttx/mm/iob.h>
 #include <nuttx/mm/mm.h>
 #include <nuttx/kmalloc.h>
+#include <nuttx/pgalloc.h>
 #include <nuttx/sched_note.h>
 #include <nuttx/binfmt/binfmt.h>
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/init.h>
-#include <nuttx/tls.h>
 
 #include "sched/sched.h"
 #include "signal/signal.h"
@@ -53,6 +53,7 @@
 #include "irq/irq.h"
 #include "group/group.h"
 #include "init/init.h"
+#include "tls/tls.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -516,7 +517,6 @@ void nx_start(void)
 
   for (i = 0; i < CONFIG_SMP_NCPUS; i++)
     {
-      FAR struct tls_info_s *info;
       int hashndx;
 
       /* Assign the process ID(s) of ZERO to the idle task(s) */
@@ -545,20 +545,17 @@ void nx_start(void)
 
       up_initial_state(&g_idletcb[i].cmn);
 
-      /* Initialize the thread local storage
-       * Note: Don't copy tdata and tss for idle task to improve footprint
-       */
+      /* Initialize the thread local storage */
 
-      info = up_stack_frame(&g_idletcb[i].cmn, sizeof(struct tls_info_s));
-      DEBUGASSERT(info == g_idletcb[i].cmn.stack_alloc_ptr);
-      info->tl_task = g_idletcb[i].cmn.group->tg_info;
+      tls_init_info(&g_idletcb[i].cmn);
 
       /* Complete initialization of the IDLE group.  Suppress retention
        * of child status in the IDLE group.
        */
 
       group_initialize(&g_idletcb[i]);
-      g_idletcb[i].cmn.group->tg_flags = GROUP_FLAG_NOCLDWAIT;
+      g_idletcb[i].cmn.group->tg_flags = GROUP_FLAG_NOCLDWAIT |
+                                         GROUP_FLAG_PRIVILEGED;
     }
 
   g_lastpid = CONFIG_SMP_NCPUS - 1;
@@ -578,7 +575,7 @@ void nx_start(void)
     }
 #endif
 
-  /* Disables context switching beacuse we need take the memory manager
+  /* Disables context switching because we need take the memory manager
    * semaphore on this CPU so that it will not be available on the other
    * CPUs until we have finished initialization.
    */
@@ -648,10 +645,6 @@ void nx_start(void)
   binfmt_initialize();
 #endif
 
-  /* Initialize common drivers */
-
-  drivers_initialize();
-
   /* Initialize Hardware Facilities *****************************************/
 
   /* The processor specific details of running the operating system
@@ -661,6 +654,10 @@ void nx_start(void)
    */
 
   up_initialize();
+
+  /* Initialize common drivers */
+
+  drivers_initialize();
 
 #ifdef CONFIG_BOARD_EARLY_INITIALIZE
   /* Call the board-specific up_initialize() extension to support

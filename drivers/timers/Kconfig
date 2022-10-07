@@ -53,6 +53,13 @@ config PWM_NCHANNELS
 endif # PWM_MULTICHAN
 endif # PWM
 
+config CAPTURE
+	bool "Capture Driver Support"
+	default n
+	---help---
+		This selection enables building of the "upper-half" Capture driver.
+		See include/nuttx/timers/capture.h for further Capture driver information.
+
 config TIMER
 	bool "Timer Support"
 	default n
@@ -312,12 +319,12 @@ endif # RTC_RX8010SJ
 config RTC_RPMSG
 	bool "Rpmsg RTC Driver"
 	default n
-	depends on OPENAMP
+	depends on RPTUN
 	select ARCH_HAVE_RTC_SUBSECONDS
 
 config RTC_RPMSG_SERVER
 	bool "The RTC Rpmsg Role"
-	depends on OPENAMP
+	depends on RPTUN
 
 config RTC_RPMSG_SERVER_NAME
 	string "The name of RTC Rpmsg Server"

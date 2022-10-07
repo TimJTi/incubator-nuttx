@@ -30,8 +30,7 @@
 #include <debug.h>
 
 #include <nuttx/arch.h>
-#include <arch/irq.h>
-#include <arch/csr.h>
+#include <nuttx/irq.h>
 
 #include "riscv_internal.h"
 #include "c906.h"
@@ -40,7 +39,7 @@
  * Public Data
  ****************************************************************************/
 
-volatile uint64_t *g_current_regs[1];
+volatile uintptr_t *g_current_regs[1];
 
 /****************************************************************************
  * Public Functions
@@ -94,13 +93,9 @@ void up_irqinitialize(void)
 
   CURRENT_REGS = NULL;
 
-  /* Attach the ecall interrupt handler */
+  /* Attach the common interrupt handler */
 
-  irq_attach(RISCV_IRQ_ECALLM, riscv_swint, NULL);
-
-#ifdef CONFIG_BUILD_PROTECTED
-  irq_attach(RISCV_IRQ_ECALLU, riscv_swint, NULL);
-#endif
+  riscv_exception_attach();
 
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
 
@@ -192,31 +187,6 @@ void up_enable_irq(int irq)
           ASSERT(false);
         }
     }
-}
-
-/****************************************************************************
- * Name: riscv_get_newintctx
- *
- * Description:
- *   Return initial mstatus when a task is created.
- *
- ****************************************************************************/
-
-uint32_t riscv_get_newintctx(void)
-{
-  /* Set machine previous privilege mode to machine mode. Reegardless of
-   * how NuttX is configured and of what kind of thread is being started.
-   * That is because all threads, even user-mode threads will start in
-   * kernel trampoline at nxtask_start() or pthread_start().
-   * The thread's privileges will be dropped before transitioning to
-   * user code. Also set machine previous interrupt enable.
-   */
-
-#ifdef CONFIG_ARCH_FPU
-  return (MSTATUS_FS_INIT | MSTATUS_MPPM | MSTATUS_MPIE);
-#else
-  return (MSTATUS_MPPM | MSTATUS_MPIE);
-#endif
 }
 
 /****************************************************************************

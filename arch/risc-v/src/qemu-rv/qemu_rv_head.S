@@ -23,9 +23,12 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
+#include <arch/arch.h>
 #include <arch/irq.h>
 
 #include "chip.h"
+#include "riscv_internal.h"
 
 /****************************************************************************
  * Public Symbols
@@ -49,13 +52,21 @@ __start:
   j    2f
 1:
 
-  /* In case of single CPU config, stop here */
+  /* Load the number of CPUs that the kernel supports */
 
-#if !defined(CONFIG_SMP) || (CONFIG_SMP_NCPUS == 1)
-  csrw mie, zero
-  wfi
+#ifdef CONFIG_SMP
+  li   t1, CONFIG_SMP_NCPUS
+#else
+  li   t1, 1
 #endif
 
+  /* If a0 (mhartid) >= t1 (the number of CPUs), stop here */
+
+  blt  a0, t1, 3f
+  csrw mie, zero
+  wfi
+
+3:
   /* To get g_cpu_basestack[mhartid], must get g_cpu_basestack first */
 
   la   t0, g_cpu_basestack
@@ -71,15 +82,16 @@ __start:
 
   /* Load idle stack base to sp */
 
-#ifdef CONFIG_ARCH_RV32
-  lw   sp, 0(t0)
-#else
-  ld   sp, 0(t0)
-#endif
+  REGLOAD sp, 0(t0)
 
-  /* sp (stack top) = sp + idle stack size */
+  /*
+   * sp (stack top) = sp + idle stack size - XCPTCONTEXT_SIZE
+   * 
+   * Note: Reserve some space used by up_initial_state since we are already
+   * running and using the per CPU idle stack.
+   */
 
-  li   t0, CONFIG_IDLETHREAD_STACKSIZE
+  li   t0, STACK_ALIGN_UP(CONFIG_IDLETHREAD_STACKSIZE - XCPTCONTEXT_SIZE)
   add  sp, sp, t0
 
 2:
@@ -93,7 +105,11 @@ __start:
 
   /* Jump to qemu_rv_start */
 
+#ifdef CONFIG_ARCH_USE_S_MODE
+  jal  x1, qemu_rv_start_s
+#else
   jal  x1, qemu_rv_start
+#endif
 
   /* We shouldn't return from _start */
 

@@ -24,6 +24,8 @@
 
 #include <nuttx/config.h>
 
+#include <arch/irq.h>
+
 #include "arm.h"
 #include "cp15.h"
 #include "sctlr.h"
@@ -92,12 +94,12 @@
 __cpu1_start:
 	/* Make sure that we are in SYS mode with IRQs and FIQs disabled */
 
-	mov		r0, #(PSR_MODE_SYS | PSR_I_BIT | PSR_F_BIT)
-	msr		cpsr_c, r0
+	cpsid		if, #PSR_MODE_SYS
 
 	/* Set up the stack pointer and the CPU index */
 
 	ldr		sp, .Lcpu1_stackpointer
+	sub		sp, sp, #XCPTCONTEXT_SIZE
 	mov		r5, #1
 
 	/* Then branch to the common startup logic (PC-relative) */
@@ -115,12 +117,12 @@ __cpu1_start:
 __cpu2_start:
 	/* Make sure that we are in SYS mode with IRQs and FIQs disabled */
 
-	mov		r0, #(PSR_MODE_SYS | PSR_I_BIT | PSR_F_BIT)
-	msr		cpsr_c, r0
+	cpsid		if, #PSR_MODE_SYS
 
 	/* Set up the stack pointer and the CPU index */
 
 	ldr		sp, .Lcpu2_stackpointer
+	sub		sp, sp, #XCPTCONTEXT_SIZE
 	mov		r5, #2
 
 	/* Then branch to the common startup logic (PC-relative) */
@@ -138,12 +140,12 @@ __cpu2_start:
 __cpu3_start:
 	/* Make sure that we are in SYS mode with IRQs and FIQs disabled */
 
-	mov		r0, #(PSR_MODE_SYS | PSR_I_BIT | PSR_F_BIT)
-	msr		cpsr_c, r0
+	cpsid		if, #PSR_MODE_SYS
 
 	/* Set up the stack pointer and the CPU index */
 
 	ldr		sp, .Lcpu3_stackpointer
+	sub		sp, sp, #XCPTCONTEXT_SIZE
 	mov		r5, #3
 
 	/* Then branch to the common startup logic (PC-relative) */
@@ -198,11 +200,17 @@ __cpu3_start:
 	 */
 
 	mov		r0, #0
+#ifdef CONFIG_ARM_HAVE_MPCORE
+	mcr		CP15_TLBIALLIS(r0)	/* Invalidate the entire unified TLB */
+	mcr		CP15_BPIALLIS(r0)	/* Invalidate entire branch prediction array */
+	mcr		CP15_ICIALLUIS(r0)	/* Invalidate I-cache */
+#else
 	mcr		CP15_TLBIALL(r0,c7)	/* Invalidate the entire unified TLB */
 	mcr		CP15_TLBIALL(r0,c6)
 	mcr		CP15_TLBIALL(r0,c5)
 	mcr		CP15_BPIALL(r0)		/* Invalidate entire branch prediction array */
 	mcr		CP15_ICIALLU(r0)	/* Invalidate I-cache */
+#endif
 
 	/* Load the page table address.
 	 *
@@ -215,6 +223,10 @@ __cpu3_start:
 	 */
 
 	ldr		r1, .LCppgtable		/* r1=phys. page table */
+#ifdef CONFIG_ARCH_ADDRENV
+	mov		r2, #PGTABLE_SIZE
+	mla		r1, r2, r5, r1		/* page table of cpu1,2,3 */
+#endif
 	orr		r1, r1, #(TTBR0_RGN_WBWA | TTBR0_IRGN0)	/* Select cache properties */
 	mcr		CP15_TTBR0(r1)
 	mcr		CP15_TTBR1(r1)
@@ -439,7 +451,7 @@ __cpu3_start:
 #ifdef CONFIG_STACK_COLORATION
 	.type	.Lstkinit, %object
 .Lstkinit:
-	.long	SMP_STACK_WORDS
+	.long	SMP_STACK_WORDS - (XCPTCONTEXT_SIZE / 4)
 	.long	STACK_COLOR				/* Stack coloration word */
 	.size	.Lstkinit, . -.Lstkinit
 #endif

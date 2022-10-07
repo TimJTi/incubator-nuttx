@@ -66,7 +66,7 @@ config MCU_SERIAL
 config RPMSG_UART
 	bool "UART rpmsg support"
 	default n
-	depends on OPENAMP
+	depends on RPTUN
 	select ARCH_HAVE_SERIAL_TERMIOS
 	select SERIAL_RXDMA
 	select SERIAL_TXDMA
@@ -232,7 +232,7 @@ config TTY_LAUNCH_FILEPATH
 	---help---
 		The name of the entry point for user applications.  For the example
 		applications this is of the form 'app_main' where 'app' is the application
-		name. If not defined, USER_ENTRYPOINT defaults to "main".
+		name. If not defined, INIT_ENTRYPOINT defaults to "main".
 
 endif # TTY_LAUNCH
 
@@ -484,6 +484,41 @@ config LPUART7_SERIAL_CONSOLE
 config LPUART8_SERIAL_CONSOLE
 	bool "LPUART8"
 	depends on LPUART8_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART9_SERIAL_CONSOLE
+	bool "LPUART9"
+	depends on LPUART9_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART10_SERIAL_CONSOLE
+	bool "LPUART10"
+	depends on LPUART10_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART11_SERIAL_CONSOLE
+	bool "LPUART11"
+	depends on LPUART11_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART12_SERIAL_CONSOLE
+	bool "LPUART12"
+	depends on LPUART12_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART13_SERIAL_CONSOLE
+	bool "LPUART13"
+	depends on LPUART13_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART14_SERIAL_CONSOLE
+	bool "LPUART14"
+	depends on LPUART14_SERIALDRIVER
+	select SERIAL_CONSOLE
+
+config LPUART15_SERIAL_CONSOLE
+	bool "LPUART15"
+	depends on LPUART15_SERIALDRIVER
 	select SERIAL_CONSOLE
 
 config SCI0_SERIAL_CONSOLE

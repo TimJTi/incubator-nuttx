@@ -190,7 +190,7 @@
 
 /* Helper to place a value in a field */
 
-#define VALUE_TO_FIELD(_value, _field) ((_value << (_field##_S)) & (_field##_M))
+#define VALUE_TO_FIELD(_value, _field) (((_value) << (_field##_S)) & (_field##_M))
 
 /* Periheral Clock */
 
@@ -298,6 +298,8 @@
 #define SOC_RTC_DATA_HIGH       0x50002000
 #define SOC_EXTRAM_DATA_LOW     0x3f500000
 #define SOC_EXTRAM_DATA_HIGH    0x3ff80000
+
+#define SOC_EXTRAM_DATA_SIZE (SOC_EXTRAM_DATA_HIGH - SOC_EXTRAM_DATA_LOW)
 
 /* Virtual address 0 */
 

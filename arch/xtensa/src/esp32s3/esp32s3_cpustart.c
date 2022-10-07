@@ -109,31 +109,14 @@ void xtensa_appcpu_start(void)
   struct tcb_s *tcb = this_task();
   register uint32_t sp;
 
-#ifdef CONFIG_STACK_COLORATION
-    {
-      register uint32_t *ptr;
-      register int i;
-
-      /* If stack debug is enabled, then fill the stack with a recognizable
-       * value that we can use later to test for high water marks.
-       */
-
-      for (i = 0, ptr = (uint32_t *)tcb->stack_alloc_ptr;
-           i < tcb->adj_stack_size;
-           i += sizeof(uint32_t))
-        {
-          *ptr++ = STACK_COLOR;
-        }
-    }
-#endif
-
   /* Move to the stack assigned to us by up_smp_start immediately.  Although
    * we were give a stack pointer at start-up, we don't know where that stack
    * pointer is positioned respect to our memory map.  The only safe option
    * is to switch to a well-known IDLE thread stack.
    */
 
-  sp = (uint32_t)tcb->stack_base_ptr + tcb->adj_stack_size;
+  sp = (uint32_t)tcb->stack_base_ptr + tcb->adj_stack_size -
+       XCPTCONTEXT_SIZE;
   __asm__ __volatile__("mov sp, %0\n" : : "r"(sp));
 
   sinfo("CPU%d Started\n", up_cpu_index());
@@ -179,6 +162,10 @@ void xtensa_appcpu_start(void)
   /* And Enable interrupts */
 
   up_irq_enable();
+#endif
+
+#if XCHAL_CP_NUM > 0
+  xtensa_set_cpenable(CONFIG_XTENSA_CP_INITSET);
 #endif
 
   /* Then switch contexts. This instantiates the exception context of the
@@ -241,35 +228,42 @@ int up_cpu_start(int cpu)
 
       spin_initialize(&g_appcpu_interlock, SP_LOCKED);
 
-      /* Unstall the APP CPU */
+      /* OpenOCD might have already enabled clock gating and taken APP CPU
+       * out of reset.  Don't reset the APP CPU if that's the case as this
+       * will clear the breakpoints that may have already been set.
+       */
 
-      regval  = getreg32(RTC_CNTL_RTC_SW_CPU_STALL_REG);
-      regval &= ~RTC_CNTL_SW_STALL_APPCPU_C1_M;
-      putreg32(regval, RTC_CNTL_RTC_SW_CPU_STALL_REG);
+      regval = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
+      if ((regval & SYSTEM_CONTROL_CORE_1_CLKGATE_EN) == 0)
+        {
+          regval  = getreg32(RTC_CNTL_RTC_SW_CPU_STALL_REG);
+          regval &= ~RTC_CNTL_SW_STALL_APPCPU_C1_M;
+          putreg32(regval, RTC_CNTL_RTC_SW_CPU_STALL_REG);
 
-      regval  = getreg32(RTC_CNTL_RTC_OPTIONS0_REG);
-      regval &= ~RTC_CNTL_SW_STALL_APPCPU_C0_M;
-      putreg32(regval, RTC_CNTL_RTC_OPTIONS0_REG);
+          regval  = getreg32(RTC_CNTL_RTC_OPTIONS0_REG);
+          regval &= ~RTC_CNTL_SW_STALL_APPCPU_C0_M;
+          putreg32(regval, RTC_CNTL_RTC_OPTIONS0_REG);
 
-      /* Enable clock gating for the APP CPU */
+          /* Enable clock gating for the APP CPU */
 
-      regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
-      regval |= SYSTEM_CONTROL_CORE_1_CLKGATE_EN;
-      putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
+          regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
+          regval |= SYSTEM_CONTROL_CORE_1_CLKGATE_EN;
+          putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
 
-      regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
-      regval &= ~SYSTEM_CONTROL_CORE_1_RUNSTALL;
-      putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
+          regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
+          regval &= ~SYSTEM_CONTROL_CORE_1_RUNSTALL;
+          putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
 
-      /* Reset the APP CPU */
+          /* Reset the APP CPU */
 
-      regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
-      regval |= SYSTEM_CONTROL_CORE_1_RESETING;
-      putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
+          regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
+          regval |= SYSTEM_CONTROL_CORE_1_RESETING;
+          putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
 
-      regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
-      regval &= ~SYSTEM_CONTROL_CORE_1_RESETING;
-      putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
+          regval  = getreg32(SYSTEM_CORE_1_CONTROL_0_REG);
+          regval &= ~SYSTEM_CONTROL_CORE_1_RESETING;
+          putreg32(regval, SYSTEM_CORE_1_CONTROL_0_REG);
+        }
 
       /* Set the CPU1 start address */
 

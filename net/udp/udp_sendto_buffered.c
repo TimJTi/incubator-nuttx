@@ -105,40 +105,6 @@ static uint16_t sendto_eventhandler(FAR struct net_driver_s *dev,
  ****************************************************************************/
 
 /****************************************************************************
- * Name: udp_inqueue_wrb_size
- *
- * Description:
- *   Get the in-queued write buffer size from connection
- *
- * Input Parameters:
- *   conn - The UDP connection of interest
- *
- * Assumptions:
- *   Called from user logic with the network locked.
- *
- ****************************************************************************/
-
-#if CONFIG_NET_SEND_BUFSIZE > 0
-static uint32_t udp_inqueue_wrb_size(FAR struct udp_conn_s *conn)
-{
-  FAR struct udp_wrbuffer_s *wrb;
-  FAR sq_entry_t *entry;
-  uint32_t total = 0;
-
-  if (conn)
-    {
-      for (entry = sq_peek(&conn->write_q); entry; entry = sq_next(entry))
-        {
-          wrb = (FAR struct udp_wrbuffer_s *)entry;
-          total += wrb->wb_iob->io_pktlen;
-        }
-    }
-
-  return total;
-}
-#endif /* CONFIG_NET_SEND_BUFSIZE */
-
-/****************************************************************************
  * Name: sendto_writebuffer_release
  *
  * Description:
@@ -535,6 +501,7 @@ ssize_t psock_udp_sendto(FAR struct socket *psock, FAR const void *buf,
 {
   FAR struct udp_wrbuffer_s *wrb;
   FAR struct udp_conn_s *conn;
+  unsigned int timeout;
   bool nonblock;
   bool empty;
   int ret = OK;
@@ -662,6 +629,7 @@ ssize_t psock_udp_sendto(FAR struct socket *psock, FAR const void *buf,
 
   nonblock = _SS_ISNONBLOCK(conn->sconn.s_flags) ||
                             (flags & MSG_DONTWAIT) != 0;
+  timeout  = _SO_TIMEOUT(conn->sconn.s_sndtimeo);
 
   /* Dump the incoming buffer */
 
@@ -676,7 +644,7 @@ ssize_t psock_udp_sendto(FAR struct socket *psock, FAR const void *buf,
        * wait for the write buffer to be released
        */
 
-      while (udp_inqueue_wrb_size(conn) + len > conn->sndbufs)
+      while (udp_wrbuffer_inqueue_size(conn) + len > conn->sndbufs)
         {
           if (nonblock)
             {
@@ -684,7 +652,16 @@ ssize_t psock_udp_sendto(FAR struct socket *psock, FAR const void *buf,
               goto errout_with_lock;
             }
 
-          net_lockedwait_uninterruptible(&conn->sndsem);
+          ret = net_timedwait_uninterruptible(&conn->sndsem, timeout);
+          if (ret < 0)
+            {
+              if (ret == -ETIMEDOUT)
+                {
+                  ret = -EAGAIN;
+                }
+
+              goto errout_with_lock;
+            }
         }
 #endif /* CONFIG_NET_SEND_BUFSIZE */
 
@@ -698,7 +675,7 @@ ssize_t psock_udp_sendto(FAR struct socket *psock, FAR const void *buf,
         }
       else
         {
-          wrb = udp_wrbuffer_alloc();
+          wrb = udp_wrbuffer_timedalloc(timeout);
         }
 
       if (wrb == NULL)
@@ -706,7 +683,16 @@ ssize_t psock_udp_sendto(FAR struct socket *psock, FAR const void *buf,
           /* A buffer allocation error occurred */
 
           nerr("ERROR: Failed to allocate write buffer\n");
-          ret = nonblock ? -EAGAIN : -ENOMEM;
+
+          if (nonblock || timeout != UINT_MAX)
+            {
+              ret = -EAGAIN;
+            }
+          else
+            {
+              ret = -ENOMEM;
+            }
+
           goto errout_with_lock;
         }
 

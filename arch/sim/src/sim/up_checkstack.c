@@ -40,10 +40,12 @@
  * Private Function Prototypes
  ****************************************************************************/
 
-static size_t do_stackcheck(uintptr_t alloc, size_t size);
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 /****************************************************************************
- * Name: do_stackcheck
+ * Name: sim_stack_check
  *
  * Description:
  *   Determine (approximately) how much stack has been used be searching the
@@ -59,11 +61,11 @@ static size_t do_stackcheck(uintptr_t alloc, size_t size);
  *
  ****************************************************************************/
 
-static size_t do_stackcheck(uintptr_t alloc, size_t size)
+size_t sim_stack_check(void *alloc, size_t size)
 {
-  FAR uintptr_t start;
-  FAR uintptr_t end;
-  FAR uint32_t *ptr;
+  uintptr_t start;
+  uintptr_t end;
+  uint32_t *ptr;
   size_t mark;
 
   if (size == 0)
@@ -73,8 +75,8 @@ static size_t do_stackcheck(uintptr_t alloc, size_t size)
 
   /* Get aligned addresses of the top and bottom of the stack */
 
-  start = (alloc + 3) & ~3;
-  end   = (alloc + size) & ~3;
+  start = ((uintptr_t)alloc + 3) & ~3;
+  end   = ((uintptr_t)alloc + size) & ~3;
 
   /* Get the adjusted size based on the top and bottom of the stack */
 
@@ -86,7 +88,7 @@ static size_t do_stackcheck(uintptr_t alloc, size_t size)
    * that does not have the magic value is the high water mark.
    */
 
-  for (ptr = (FAR uint32_t *)start, mark = (size >> 2);
+  for (ptr = (uint32_t *)start, mark = (size >> 2);
        *ptr == STACK_COLOR && mark > 0;
        ptr++, mark--);
 
@@ -106,7 +108,7 @@ static size_t do_stackcheck(uintptr_t alloc, size_t size)
       int i;
       int j;
 
-      ptr = (FAR uint32_t *)start;
+      ptr = (uint32_t *)start;
       for (i = 0; i < size; i += 4 * 64)
         {
           for (j = 0; j < 64; j++)
@@ -135,10 +137,6 @@ static size_t do_stackcheck(uintptr_t alloc, size_t size)
 }
 
 /****************************************************************************
- * Public Functions
- ****************************************************************************/
-
-/****************************************************************************
  * Name: up_check_stack and friends
  *
  * Description:
@@ -154,22 +152,23 @@ static size_t do_stackcheck(uintptr_t alloc, size_t size)
  *
  ****************************************************************************/
 
-size_t up_check_tcbstack(FAR struct tcb_s *tcb)
+size_t up_check_tcbstack(struct tcb_s *tcb)
 {
-  return do_stackcheck((uintptr_t)tcb->stack_base_ptr, tcb->adj_stack_size);
+  return sim_stack_check((void *)(uintptr_t)tcb->stack_base_ptr,
+                         tcb->adj_stack_size);
 }
 
-ssize_t up_check_tcbstack_remain(FAR struct tcb_s *tcb)
+ssize_t up_check_tcbstack_remain(struct tcb_s *tcb)
 {
   return tcb->adj_stack_size - up_check_tcbstack(tcb);
 }
 
 size_t up_check_stack(void)
 {
-  return up_check_tcbstack(this_task());
+  return up_check_tcbstack(running_task());
 }
 
 ssize_t up_check_stack_remain(void)
 {
-  return up_check_tcbstack_remain(this_task());
+  return up_check_tcbstack_remain(running_task());
 }
