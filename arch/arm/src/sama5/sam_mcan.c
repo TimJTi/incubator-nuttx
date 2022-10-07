@@ -892,7 +892,7 @@ struct sam_mcan_s
 
   const struct sam_config_s *config;
 
-  uint8_t state;            /* See enum can_state_s */
+  enum can_state_s state;            /* See enum can_state_s */
 #ifdef CONFIG_CAN_EXTID
   uint8_t nextalloc;        /* Number of allocated extended filters */
 #endif
