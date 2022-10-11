@@ -27,7 +27,7 @@ The same set of files as provided for in tree boards is required (i.e. configs,
 Kconfig, scripts, etc.) but these can be placed in a directory of your choice.
 
 In this example, the files are assumed to exist in:
- ``../nuttx/CustomBoards/MyCustomBoardName``
+ ``../nuttx/CustomBoards/MyCustomBoardName`` 
 
     .. code-block:: console
 
