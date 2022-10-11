@@ -58,12 +58,15 @@ Kconfig Settings
 ----------------
 Once the board is configured, to ensure subsequent builds run correctly, There
 are some Kconfig settings that need to be set. There are:
-:menuselection: `Board Selection --> Custom Board Configuration --> Custom Board Name` and
-:menuselection: `Board Selection --> Custom Board Configuration --> Relative custom board directory`
+
+:menuselection:`Board Selection --> Custom Board Configuration --> Custom Board Name`
+
+:menuselection:`Board Selection --> Custom Board Configuration --> Relative custom board directory`
+
 and should be set to suit your board name and directory location.
 
-.. NB::
-   If you subsequently run a ``make distclean`` operation, the :menuselection: `Board Selection --> Custom Board Configuration` settings will be lost.
+.. Tip::
+   If you subsequently run a ``make distclean`` operation, then those settings will be lost.
 
 Custom Apps
 ===========
