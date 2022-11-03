@@ -137,6 +137,18 @@
 #  define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
+#ifndef BOARD_TSSCTIM
+# define BOARD_TSSCTIM 0
+#endif
+
+#ifndef BOARD_TSD_PENDETSENS
+# define BOARD_TSD_PENDETSENS 0
+#endif
+
+#if !defined BOARD_TSD_IBCTL && defined ATSAMA5D2
+# define BOARD_TSD_IBCTL 0
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -465,16 +477,18 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
       if (minfreq > tsfreq)
         {
           /* Set TSFREQ = TSAV */
-
-          regval &= ~ADC_TSMR_TSFREQ_MASK;
-          regval |=  ADC_TSMR_TSFREQ(minfreq);
+          tsfreq = minfreq;
         }
+      
+      regval &= ~ADC_TSMR_TSFREQ_MASK;
+      regval |= ADC_TSMR_TSFREQ(tsfreq);
     }
 
   /* Save the new filter value */
 
   regval &= ~ADC_TSMR_TSAV_MASK;
-  regval |= tsav;
+  //regval |= tsav;
+  regval |= ADC_TSMR_TSAV(tsav);
   sam_adc_putreg(priv->adc, SAM_ADC_TSMR, regval);
 }
 
@@ -606,15 +620,22 @@ static void sam_tsd_bottomhalf(void *arg)
 
       ier = ADC_TSD_RELEASEINTS;
 
-      /* Check if all of the date that we need is available.  If not, just
+      /* Check if all of the data that we need is available.  If not, just
        * re-enable interrupts and wait until it is.
        */
-
+ 
       if ((pending & TSD_ALLREADY) != TSD_ALLREADY)
         {
           /* But don't enable interrupts for the data that we already have */
 
           ier &= ~(pending & TSD_ALLREADY);
+          
+          /* Configure for periodic trigger */
+
+          regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
+          regval &= ~ADC_TRGR_TRGMOD_MASK;
+          regval |= ADC_TRGR_TRGMOD_PERIOD;
+          sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
           goto ignored;
         }
 
@@ -628,6 +649,8 @@ static void sam_tsd_bottomhalf(void *arg)
       yraw   = (regval & ADC_YPOSR_YPOS_MASK) >> ADC_YPOSR_YPOS_SHIFT;
       yscale = (regval & ADC_YPOSR_YSCALE_MASK) >> ADC_YPOSR_YSCALE_SHIFT;
 
+      regval = sam_adc_getreg(priv->adc, SAM_ADC_EMR);
+
 #ifdef CONFIG_SAMA5_TSD_4WIRE
       /* Read the PRESSR register now, but don't do anything until we
        * decide if we are going to use this measurement.
@@ -635,22 +658,24 @@ static void sam_tsd_bottomhalf(void *arg)
 
       pressr = sam_adc_getreg(priv->adc, SAM_ADC_PRESSR);
 #endif
+#if 1
       /* Discard any bad readings.  This check may not be necessary. */
-
-      //if (xraw == 0 || xraw >= xscale || yraw == 0 || yraw > yscale)
-        //{
-          //iwarn("WARNING: Discarding: x %" PRId32 ":%" PRId32
-            //    " y %" PRId32 ":%" PRId32 "\n",
-              //  xraw, xscale,
-                //yraw, yscale);
-          //goto ignored;
-        //}
-
+      if (xraw == 0 || xraw >= xscale || yraw == 0 || yraw > yscale)
+        {
+          iwarn("WARNING: Discarding: x %" PRId32 ":%" PRId32
+                " y %" PRId32 ":%" PRId32 "\n",
+                xraw, xscale,
+                yraw, yscale);
+                //regval = ADC_CR_TSCALIB;
+                //sam_adc_putreg(priv->adc, SAM_ADC_CR, regval);                
+          goto ignored;
+        }
+#endif
       /* Scale the X/Y measurements.  The scale value is the maximum
        * value that the sample can attain.  It should be close to 4095.
        * Scaling:
        *
-       *   scaled = raw * 4095 / scale
+       *   scaled = raw * (4095 / scale)
        *          = ((raw << 12) - raw) / scale
        */
 
@@ -715,7 +740,18 @@ static void sam_tsd_bottomhalf(void *arg)
 
       z2 = (pressr & ADC_PRESSR_Z2_MASK) >> ADC_PRESSR_Z2_SHIFT;
       z1 = (pressr & ADC_PRESSR_Z1_MASK) >> ADC_PRESSR_Z1_SHIFT;
-      p  = CONFIG_SAMA_TSD_RXP * xraw * (z2 - z1) / z1;
+
+      if (z1 != 0)
+        {
+          uint32_t factor = 1000;
+          //p  = CONFIG_SAMA_TSD_RXP * xraw * (z2 - z1) /z1;
+          p  = CONFIG_SAMA_TSD_RXP * (xraw * factor / 1024) *
+                   (z2 * factor / z1 - factor) / factor;
+        }
+      else
+        {
+          p = 0xffff;
+        }
 
       priv->sample.p = MIN(p, UINT16_MAX);
 #endif
@@ -831,8 +867,9 @@ static int sam_tsd_open(struct file *filep)
 {
   struct inode *inode = filep->f_inode;
   struct sam_tsd_s *priv = inode->i_private;
-  uint8_t tmp;
+
   int ret;
+  int tmp;
 
   iinfo("crefs: %d\n", priv->crefs);
 
@@ -840,7 +877,7 @@ static int sam_tsd_open(struct file *filep)
 
   sam_adc_lock(priv->adc);
 
-  /* Increment the count of references to the device.  If this the first
+   /* Increment the count of references to the device.  If this the first
    * time that the driver has been opened for this device, then initialize
    * the device.
    */
@@ -902,7 +939,9 @@ static int sam_tsd_close(struct file *filep)
   if (priv->crefs == 0)
     {
       sam_tsd_uninitialize(priv);
+      sam_adc_shutdown((struct adc_dev_s *) priv);
     }
+  
 
   sam_adc_unlock(priv->adc);
   return OK;
@@ -1209,67 +1248,67 @@ static void sam_tsd_startuptime(struct sam_tsd_s *priv, uint32_t time)
 
   if (startup > 896)
     {
-      regval = ADC_MR_STARTUP_960;
+      regval |= ADC_MR_STARTUP_960;
     }
   else if (startup > 832)
     {
-      regval = ADC_MR_STARTUP_896;
+      regval |= ADC_MR_STARTUP_896;
     }
   else if (startup > 768)
     {
-      regval = ADC_MR_STARTUP_832;
+      regval |= ADC_MR_STARTUP_832;
     }
   else if (startup > 704)
     {
-      regval = ADC_MR_STARTUP_768;
+      regval |= ADC_MR_STARTUP_768;
     }
   else if (startup > 640)
     {
-      regval = ADC_MR_STARTUP_704;
+      regval |= ADC_MR_STARTUP_704;
     }
   else if (startup > 576)
     {
-      regval = ADC_MR_STARTUP_640;
+      regval |= ADC_MR_STARTUP_640;
     }
   else if (startup > 512)
     {
-      regval = ADC_MR_STARTUP_576;
+      regval |= ADC_MR_STARTUP_576;
     }
   else if (startup > 112)
     {
-      regval = ADC_MR_STARTUP_512;
+      regval |= ADC_MR_STARTUP_512;
     }
   else if (startup > 96)
     {
-      regval = ADC_MR_STARTUP_112;
+      regval |= ADC_MR_STARTUP_112;
     }
   else if (startup > 80)
     {
-      regval = ADC_MR_STARTUP_96;
+      regval |= ADC_MR_STARTUP_96;
     }
   else if (startup > 64)
     {
-      regval = ADC_MR_STARTUP_80;
+      regval |= ADC_MR_STARTUP_80;
     }
   else if (startup > 24)
     {
-      regval = ADC_MR_STARTUP_64;
+      regval |= ADC_MR_STARTUP_64;
     }
   else if (startup > 16)
     {
-      regval = ADC_MR_STARTUP_24;
+      regval |= ADC_MR_STARTUP_24;
     }
   else if (startup > 8)
     {
-      regval = ADC_MR_STARTUP_16;
+      regval |= ADC_MR_STARTUP_16;
     }
   else if (startup > 0)
     {
-      regval = ADC_MR_STARTUP_8;
+      regval |= ADC_MR_STARTUP_8;
     }
   else
     {
-      regval = ADC_MR_STARTUP_0;
+      regval |= ADC_MR_STARTUP_0;
     }
 
   sam_adc_putreg(priv->adc, SAM_ADC_MR, regval);
@@ -1357,6 +1396,7 @@ static void sam_tsd_trigperiod(struct sam_tsd_s *priv, uint32_t period)
   uint32_t trigper;
   uint32_t regval;
   uint32_t div;
+  uint32_t tmp;
 
   /* Divide trigger period avoid overflows.  Division by ten is awkard, but
    * appropriate here because times are specified in decimal with lots of
@@ -1374,7 +1414,7 @@ static void sam_tsd_trigperiod(struct sam_tsd_s *priv, uint32_t period)
    *
    *   Trigger Period = (TRGPER+1) / ADCCLK
    */
-
+  tmp = BOARD_ADCCLK_FREQUENCY;
   trigper = (period * BOARD_ADCCLK_FREQUENCY) / div;
   if ((trigper % 10) != 0)
     {
@@ -1494,6 +1534,8 @@ static void sam_tsd_debounce(struct sam_tsd_s *priv, uint32_t time)
 static void sam_tsd_initialize(struct sam_tsd_s *priv)
 {
   uint32_t regval;
+  int ret;
+  
 
   /* Disable touch trigger */
 
@@ -1521,18 +1563,22 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   regval |= ADC_TSMR_TSMODE_4WIRE;
 #endif
 
+  regval &= ~ADC_TSMR_TSSCTIM_MASK;
+  regval |= ADC_TSMR_TSSCTIM(BOARD_TSSCTIM);
+
   sam_adc_putreg(priv->adc, SAM_ADC_TSMR, regval);
 
   /* Disable averaging */
 
   sam_tsd_setaverage(priv, ADC_TSMR_TSAV_NOFILTER);
+#if 0
+  /* this has already been done, above */
 
   /* Select 4-wire w/pressure, 4-wire w/o pressure, or 5 wire modes */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
   regval &= ~ADC_TSMR_TSMODE_MASK;
   
-#if 0
 #if defined(CONFIG_SAMA5_TSD_5WIRE)
   regval |= ADC_TSMR_TSMODE_5WIRE;
 #elif defined(CONFIG_SAMA5_TSD_4WIRENPM)
@@ -1541,6 +1587,7 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   regval |= ADC_TSMR_TSMODE_4WIRE;
 #endif
 #endif
+
   /* Disable all TSD-related interrupts */
 
   sam_adc_putreg(priv->adc, SAM_ADC_IDR, ADC_TSD_ALLINTS);
@@ -1567,6 +1614,15 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 
   sam_tsd_debounce(priv, BOARD_TSD_DEBOUNCE);
 
+  /* configure pen sensitivity */
+  regval = sam_adc_getreg(priv->adc, SAM_ADC_ACR);
+  regval &= ~ADC_ACR_PENDETSENS_MASK;
+  regval |= ADC_ACR_PENDETSENS(BOARD_TSD_PENDETSENS);
+#if defined ATSAMA5D2
+  regval &= ~ADC_ACR_IBCTL_MASK;
+  regval |= ADC_ACR_IBCTL(BOARD_TSD_IBCTL);
+#endif
+  sam_adc_putreg(priv->adc, SAM_ADC_ACR, regval);
   /* Configure pen interrupt generation */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
@@ -1574,7 +1630,27 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   regval |= ADC_TRGR_TRGMOD_PEN;
   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
 
+  regval  = sam_adc_getreg(priv->adc, SAM_ADC_IER);
+  regval |= ADC_INT_PEN;
   sam_adc_putreg(priv->adc, SAM_ADC_IER, ADC_INT_PEN);
+  sam_adc_putreg(priv->adc, SAM_ADC_IER, regval);
+
+  regval = sam_adc_getreg(priv->adc, SAM_ADC_CR);
+
+  /* perform a ts calibration */
+  regval = ADC_CR_TSCALIB | ADC_CR_START;
+  sam_adc_putreg(priv->adc, SAM_ADC_CR, regval);
+  //usleep(100000);
+
+
+  if (priv->adc->nopen == 0)
+    {
+      /* Enable the ADC interrupt at the AIC */
+
+      up_enable_irq(SAM_IRQ_ADC);
+    }
+    priv->adc->nopen++;
+
 }
 
 /****************************************************************************
@@ -1650,8 +1726,10 @@ static void sam_tsd_uninitialize(struct sam_tsd_s *priv)
  *
  ****************************************************************************/
 
-int sam_tsd_register(struct sam_adc_s *adc, int minor)
+//int sam_tsd_register(struct sam_adc_s *adc, int minor)
+int sam_tsd_register(struct adc_dev_s *adc, int minor)
 {
+  struct sam_adc_s *tsd = adc->ad_priv;
   struct sam_tsd_s *priv = &g_tsd;
   char devname[DEV_NAMELEN];
   int ret;
@@ -1665,7 +1743,8 @@ int sam_tsd_register(struct sam_adc_s *adc, int minor)
   /* Initialize the touchscreen device driver instance */
 
   memset(priv, 0, sizeof(struct sam_tsd_s));
-  priv->adc     = adc;               /* Save the ADC device handle */
+  //priv->adc     = adc;               /* Save the ADC device handle */
+  priv->adc     = tsd;               /* Save the ADC device handle */
   priv->threshx = INVALID_THRESHOLD; /* Initialize thresholding logic */
   priv->threshy = INVALID_THRESHOLD; /* Initialize thresholding logic */
 

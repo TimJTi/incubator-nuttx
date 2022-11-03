@@ -80,7 +80,7 @@
 #define SAM_ADC_CDR3_OFFSET        0x005c /* Channel Data Register 3 */
 #define SAM_ADC_CDR4_OFFSET        0x0060 /* Channel Data Register 4 */
 
-#ifdef ATSAMA5D3
+#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
 #  define SAM_ADC_CDR5_OFFSET      0x0064 /* Channel Data Register 5 */
 #  define SAM_ADC_CDR6_OFFSET      0x0068 /* Channel Data Register 6 */
 #  define SAM_ADC_CDR7_OFFSET      0x006c /* Channel Data Register 7 */
@@ -135,7 +135,7 @@
 #define SAM_ADC_CDR3               (SAM_TSADC_VBASE+SAM_ADC_CDR3_OFFSET)
 #define SAM_ADC_CDR4               (SAM_TSADC_VBASE+SAM_ADC_CDR4_OFFSET)
 
-#ifdef ATSAMA5D3
+#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
 #  define SAM_ADC_CDR5             (SAM_TSADC_VBASE+SAM_ADC_CDR5_OFFSET)
 #  define SAM_ADC_CDR6             (SAM_TSADC_VBASE+SAM_ADC_CDR6_OFFSET)
 #  define SAM_ADC_CDR7             (SAM_TSADC_VBASE+SAM_ADC_CDR7_OFFSET)
@@ -161,10 +161,7 @@
 #define ADC_CR_SWRST               (1 << 0)  /* Bit 0:  Software Reset */
 #define ADC_CR_START               (1 << 1)  /* Bit 1:  Start Conversion */
 #define ADC_CR_TSCALIB             (1 << 2)  /* Bit 2:  Touchscreen Calibration */
-
-#ifdef ATSAMA5D3
-#  define ADC_CR_AUTOCAL           (1 << 3)  /* Bit 3:  Automatic Calibration of ADC */
-#endif
+#define ADC_CR_AUTOCAL             (1 << 3)  /* Bit 3:  Automatic Calibration of ADC */
 
 /* Mode Register and ADC Mode Register common bit-field definitions */
 
@@ -359,7 +356,7 @@
 #define ADC_INT_YRDY               (1 << 21) /* Bit 21: TS Measure YPOS Ready Interrupt */
 #define ADC_INT_PRDY               (1 << 22) /* Bit 22: TS Measure Pressure Ready Interrupt */
 
-#ifdef ATSAMA5D3
+#if defined (ATSAMA5D3)
 #  define ADC_INT_EOCAL            (1 << 23) /* Bit 23: End of Calibration Sequence */
 #endif
 
@@ -502,7 +499,11 @@
 /* Channel Data Register */
 
 #define ADC_CDR_DATA_SHIFT         (0)       /* Bits 0-11: Converted Data */
+#if defined ATSAMA5D2
+#define ADC_CDR_DATA_MASK          (0x3fff << ADC_CDR_DATA_SHIFT)
+#elif
 #define ADC_CDR_DATA_MASK          (0xfff << ADC_CDR_DATA_SHIFT)
+#endif
 
 /* Compare Window Register */
 
@@ -519,6 +520,12 @@
 #define ADC_ACR_PENDETSENS_MASK    (3 << ADC_ACR_PENDETSENS_SHIFT)
 #  define ADC_ACR_PENDETSENS(n)    ((uint32_t)(n) << ADC_ACR_PENDETSENS_SHIFT)
 
+#if defined ATSAMA5D2
+#define ADC_ACR_IBTL_SHIFT         (8) /* Bits 8-9: ADC Bias Current Control */
+#define ADC_ACR_IBCTL_MASK         (3 << ADC_ACR_IBTL_SHIFT)
+#  define ADC_ACR_IBCTL(n)         ((uint32_t)(n) << ADC_ACR_IBTL_SHIFT)
+#endif
+
 /* Touchscreen Mode Register */
 
 #define ADC_TSMR_TSMODE_SHIFT      (0)       /* Bit 0-1: Touchscreen Mode */
@@ -534,6 +541,7 @@
 #  define ADC_TSMR_TSAV_2CONV      (1 << ADC_TSMR_TSAV_SHIFT) /* Average 2 ADC conversions */
 #  define ADC_TSMR_TSAV_4CONV      (2 << ADC_TSMR_TSAV_SHIFT) /* Average 4 ADC conversions */
 #  define ADC_TSMR_TSAV_8CONV      (3 << ADC_TSMR_TSAV_SHIFT) /* Averages 8 ADC conversions */
+#  define ADC_TSMR_TSAV(n)         ((uint32_t)(n) << ADC_TSMR_TSAV_SHIFT)
 
 #define ADC_TSMR_TSFREQ_SHIFT      (8)       /* Bit 8-11: Touchscreen Frequency */
 #define ADC_TSMR_TSFREQ_MASK       (15 << ADC_TSMR_TSFREQ_SHIFT)

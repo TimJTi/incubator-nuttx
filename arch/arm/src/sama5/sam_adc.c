@@ -378,7 +378,7 @@
 /****************************************************************************
  * Private Types
  ****************************************************************************/
-
+#if 0
 /* This structure describes the overall state of the ADC */
 
 struct sam_adc_s
@@ -386,6 +386,7 @@ struct sam_adc_s
   const struct adc_callback_s *cb;
   sem_t exclsem;         /* Supports exclusive access to the ADC interface */
   bool initialized;      /* The ADC driver is already initialized */
+  int nopen;             /* number times this ADC peripheral's been opened*/
   uint32_t frequency;    /* ADC clock frequency */
 
 #ifdef SAMA5_ADC_HAVE_CHANNELS
@@ -421,7 +422,7 @@ struct sam_adc_s
   int ntimes;           /* Number of times */
 #endif
 };
-
+#endif
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -457,7 +458,6 @@ static int  sam_adc_bind(struct adc_dev_s *dev,
                          const struct adc_callback_s *callback);
 static void sam_adc_reset(struct adc_dev_s *dev);
 static int  sam_adc_setup(struct adc_dev_s *dev);
-static void sam_adc_shutdown(struct adc_dev_s *dev);
 static void sam_adc_rxint(struct adc_dev_s *dev, bool enable);
 static int  sam_adc_ioctl(struct adc_dev_s *dev, int cmd, unsigned long arg);
 
@@ -888,7 +888,7 @@ static void sam_adc_endconversion(void *arg)
               /* Perform the data received callback */
 
               DEBUGASSERT(priv->cb->au_receive != NULL);
-              priv->cb->au_receive(priv->dev, chan, regval &
+              priv->cb->au_receive(priv->dev, chan, regval & 
                                    ADC_CDR_DATA_MASK);
             }
 
@@ -919,12 +919,14 @@ static int sam_adc_interrupt(int irq, void *context, void *arg)
   struct sam_adc_s *priv = &g_adcpriv;
   uint32_t isr;
   uint32_t imr;
+  uint32_t ier;
   uint32_t pending;
 
   /* Get the set of unmasked, pending ADC interrupts */
 
   isr     = sam_adc_getreg(priv, SAM_ADC_ISR);
   imr     = sam_adc_getreg(priv, SAM_ADC_IMR);
+
   pending = isr & imr;
 
   /* Handle pending touchscreen interrupts */
@@ -1160,9 +1162,14 @@ static int sam_adc_setup(struct adc_dev_s *dev)
 
     sam_adc_putreg(priv, SAM_ADC_IDR, ADC_INT_ALL);
 
-    /* Enable the ADC interrupt at the AIC */
+    if (priv->nopen == 0)
+      {
+        /* Enable the ADC interrupt at the AIC */
 
-    up_enable_irq(SAM_IRQ_ADC);
+        up_enable_irq(SAM_IRQ_ADC);
+      }
+
+    priv->nopen++;
 
   /* Configure trigger mode and start conversion */
 
@@ -1178,26 +1185,41 @@ static int sam_adc_setup(struct adc_dev_s *dev)
  *
  ****************************************************************************/
 
-static void sam_adc_shutdown(struct adc_dev_s *dev)
+void sam_adc_shutdown(struct adc_dev_s *dev)
 {
 #ifdef CONFIG_SAMA5_ADC_DMA
   struct sam_adc_s *priv = (struct sam_adc_s *)dev->ad_priv;
+#else
+  struct sam_adc_s *priv = &g_adcpriv;
 #endif
 
   ainfo("Shutdown\n");
 
-  /* Reset the ADC peripheral */
+  /* resetting the adc will stop the touchscreen from working */
+  /* Decrement the references to the driver */
 
-  sam_adc_reset(dev);
+  DEBUGASSERT(priv->nopen > 0);
+  priv->nopen--;
 
-  /* Disable ADC interrupts at the level of the AIC */
+  if (priv->nopen == 0)
+    {
+      /* Reset the ADC peripheral */
 
-  //up_disable_irq(SAM_IRQ_ADC);
+      sam_adc_reset(dev);
+      /* Disable ADC interrupts at the level of the AIC */
 
-  /* Then detach the ADC interrupt handler. */
+      up_disable_irq(SAM_IRQ_ADC);
+#if 0
+      /* this will kill the TSD forever
+       * e.g. if tsd is opened, closed, then reopened
+       * a detach can not be recovered from easily.
+       * 
+       * Revisit will be needed. */
 
-  //irq_detach(SAM_IRQ_ADC);
-
+      /* Then detach the ADC interrupt handler. */
+      irq_detach(SAM_IRQ_ADC);
+#endif
+    }
 }
 
 /****************************************************************************
@@ -1554,8 +1576,10 @@ static void sam_adc_autocalibrate(struct sam_adc_s *priv)
 
   /* Wait for auto calibration to complete */
 
+  /* Need to revisit as ADC may not be set to trigger as yet */
+
   while ((sam_adc_getreg(priv, SAM_ADC_ISR) &
-          ADC_ISR_EOCAL) != ADC_ISR_EOCAL);
+          ADC_INT_EOCAL) != ADC_INT_EOCAL);
 #endif
 }
 
@@ -1889,7 +1913,7 @@ static void sam_adc_sequencer(struct sam_adc_s *priv)
   /* Save the new values to the SEQR1 and SEQR2 registers */
 
   sam_adc_putreg(priv, SAM_ADC_SEQR1, seqr1);
-  sam_adc_putreg(priv, SAM_ADC_SEQR2, seqr2);
+  sam_adc_putreg(priv, fseqr2, seqr2);
 
   /* Enable sequencer.  Any channel that is not enabled will be skipped by
    * the sequencer (that is why we programmed the unused channels above.
@@ -2153,8 +2177,11 @@ struct adc_dev_s *sam_adc_initialize(void)
                 ADC_MR_SETTLING_MASK);
       regval |= (ADC_MR_STARTUP_512 | ADC_MR_TRACKTIM(0) |
                 ADC_MR_SETTLING_17);
+#if defined ATSAMA5D2
+      regval |= ADC_MR_TRANSFER;
+#endif
       sam_adc_putreg(priv, SAM_ADC_MR, regval);
-#if 0
+
       /* Attach the ADC interrupt */
 
       ret = irq_attach(SAM_IRQ_ADC, sam_adc_interrupt, NULL);
@@ -2171,14 +2198,16 @@ struct adc_dev_s *sam_adc_initialize(void)
       /* Enable the ADC interrupt at the AIC */
 
       up_enable_irq(SAM_IRQ_ADC);
-#endif
+
       /* Now we are initialized */
 
       priv->initialized = true;
     }
 
-  /* Return a pointer to the device structure */
 
+
+  /* Return a pointer to the device structure */
+ 
   ainfo("Returning %p\n", &g_adcdev);
   return &g_adcdev;
 }
