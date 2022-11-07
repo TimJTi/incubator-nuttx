@@ -626,14 +626,14 @@ static void sam_tsd_bottomhalf(void *arg)
 #endif
       /* Discard any bad readings.  This check may not be necessary. */
 
-      if (xraw == 0 || xraw >= xscale || yraw == 0 || yraw > yscale)
-        {
-          iwarn("WARNING: Discarding: x %" PRId32 ":%" PRId32
-                " y %" PRId32 ":%" PRId32 "\n",
-                xraw, xscale,
-                yraw, yscale);
-          goto ignored;
-        }
+      //if (xraw == 0 || xraw >= xscale || yraw == 0 || yraw > yscale)
+        //{
+          //iwarn("WARNING: Discarding: x %" PRId32 ":%" PRId32
+            //    " y %" PRId32 ":%" PRId32 "\n",
+              //  xraw, xscale,
+                //yraw, yscale);
+          //goto ignored;
+        //}
 
       /* Scale the X/Y measurements.  The scale value is the maximum
        * value that the sample can attain.  It should be close to 4095.
@@ -858,6 +858,7 @@ static int sam_tsd_open(struct file *filep)
 
       ret = OK;
     }
+  
 
   sam_adc_unlock(priv->adc);
   return ret;
@@ -1519,7 +1520,8 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
   regval &= ~ADC_TSMR_TSMODE_MASK;
-
+  
+#if 0
 #if defined(CONFIG_SAMA5_TSD_5WIRE)
   regval |= ADC_TSMR_TSMODE_5WIRE;
 #elif defined(CONFIG_SAMA5_TSD_4WIRENPM)
@@ -1527,7 +1529,7 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 #else /* if defined(CONFIG_SAMA5_TSD_4WIRE) */
   regval |= ADC_TSMR_TSMODE_4WIRE;
 #endif
-
+#endif
   /* Disable all TSD-related interrupts */
 
   sam_adc_putreg(priv->adc, SAM_ADC_IDR, ADC_TSD_ALLINTS);
@@ -1545,7 +1547,8 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 #endif
 
   /* Enable pen contact detection */
-
+  
+  regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
   regval |= ADC_TSMR_PENDET;
   sam_adc_putreg(priv->adc, SAM_ADC_TSMR, regval);
 

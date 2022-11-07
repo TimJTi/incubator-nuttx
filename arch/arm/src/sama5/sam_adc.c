@@ -1018,7 +1018,7 @@ static int sam_adc_bind(struct adc_dev_s *dev,
 
 static void sam_adc_reset(struct adc_dev_s *dev)
 {
-#ifdef CONFIG_SAMA5_ADC_DMA
+#ifdef CONFIG_SAMA5_ADC_REGDEBUG
   struct sam_adc_s *priv = (struct sam_adc_s *)dev->ad_priv;
 #endif
   uint32_t regval;
@@ -1060,7 +1060,9 @@ static void sam_adc_reset(struct adc_dev_s *dev)
 
   /* Reset gain, offset, differential modes */
 
+#if defined (ATSAMA5D3)
   sam_adc_putreg(priv, SAM_ADC_CGR, 0);
+#endif
   sam_adc_putreg(priv, SAM_ADC_COR, 0);
 
 #ifndef CONFIG_SAMA5_ADC_SWTRIG
@@ -1092,6 +1094,7 @@ static int sam_adc_setup(struct adc_dev_s *dev)
 {
   struct sam_adc_s *priv = (struct sam_adc_s *)dev->ad_priv;
   uint32_t regval;
+  int ret;
 
   ainfo("Setup\n");
 
@@ -1144,6 +1147,23 @@ static int sam_adc_setup(struct adc_dev_s *dev)
 
 #endif
 
+    /* Attach the ADC interrupt */
+
+    ret = irq_attach(SAM_IRQ_ADC, sam_adc_interrupt, NULL);
+    if (ret < 0)
+      {
+        aerr("ERROR: Failed to attach IRQ %d: %d\n", SAM_IRQ_ADC, ret);
+        return NULL;
+      }
+
+    /* Disable all ADC interrupts at the source */
+
+    sam_adc_putreg(priv, SAM_ADC_IDR, ADC_INT_ALL);
+
+    /* Enable the ADC interrupt at the AIC */
+
+    up_enable_irq(SAM_IRQ_ADC);
+
   /* Configure trigger mode and start conversion */
 
   return sam_adc_trigger(priv);
@@ -1172,11 +1192,12 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
 
   /* Disable ADC interrupts at the level of the AIC */
 
-  up_disable_irq(SAM_IRQ_ADC);
+  //up_disable_irq(SAM_IRQ_ADC);
 
   /* Then detach the ADC interrupt handler. */
 
-  irq_detach(SAM_IRQ_ADC);
+  //irq_detach(SAM_IRQ_ADC);
+
 }
 
 /****************************************************************************
@@ -1189,7 +1210,7 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
 
 static void sam_adc_rxint(struct adc_dev_s *dev, bool enable)
 {
-#ifdef CONFIG_SAMA5_ADC_DMA
+#ifdef CONFIG_SAMA5_ADC_REGDEBUG
   struct sam_adc_s *priv = (struct sam_adc_s *)dev->ad_priv;
 #endif
 
@@ -1710,15 +1731,16 @@ static void sam_adc_gain(struct sam_adc_s *priv)
 #ifdef CONFIG_SAMA5_ADC_CHAN11
   regval |= ADC_CGR_GAIN11(CONFIG_SAMA5_ADC_GAIN11);
 #endif
-
+#if defined (ATSAMA5D3)
   sam_adc_putreg(priv, SAM_ADC_CGR, regval);
-
+#endif
 #else
   ainfo("Gain=%d\n", CONFIG_SAMA5_ADC_GAIN);
 
   /* Set GAIN0 only.  GAIN0 will be used for all channels. */
-
+#if defined (ATSAMA5D3)
   sam_adc_putreg(priv, SAM_ADC_CGR, ADC_CGR_GAIN0(CONFIG_SAMA5_ADC_GAIN));
+#endif
 #endif
 }
 
@@ -1972,7 +1994,7 @@ static void sam_adc_channels(struct sam_adc_s *priv)
  *   Initialize the adc
  *
  * Returned Value:
- *   Valid can device structure reference on success; a NULL on failure
+ *   Valid adc device structure reference on success; a NULL on failure
  *
  ****************************************************************************/
 
@@ -2132,7 +2154,7 @@ struct adc_dev_s *sam_adc_initialize(void)
       regval |= (ADC_MR_STARTUP_512 | ADC_MR_TRACKTIM(0) |
                 ADC_MR_SETTLING_17);
       sam_adc_putreg(priv, SAM_ADC_MR, regval);
-
+#if 0
       /* Attach the ADC interrupt */
 
       ret = irq_attach(SAM_IRQ_ADC, sam_adc_interrupt, NULL);
@@ -2149,7 +2171,7 @@ struct adc_dev_s *sam_adc_initialize(void)
       /* Enable the ADC interrupt at the AIC */
 
       up_enable_irq(SAM_IRQ_ADC);
-
+#endif
       /* Now we are initialized */
 
       priv->initialized = true;
