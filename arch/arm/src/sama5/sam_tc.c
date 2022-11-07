@@ -165,10 +165,9 @@ static bool sam_checkreg(struct sam_tc_s *tc, bool wr, uint32_t regaddr,
 
 static inline uint32_t sam_tc_getreg(struct sam_chan_s *chan,
                                      unsigned int offset);
-//static inline void sam_tc_putreg(struct sam_chan_s *chan,
-//                                 unsigned int offset, uint32_t regval);
-static inline void sam_tc_putreg(struct sam_chan_s *chan, uint32_t regval,
-                                 unsigned int offset);
+static inline void sam_tc_putreg(struct sam_chan_s *chan,
+                                 unsigned int offset, uint32_t regval);
+
 static inline uint32_t sam_chan_getreg(struct sam_chan_s *chan,
                                        unsigned int offset);
 static inline void sam_chan_putreg(struct sam_chan_s *chan,
@@ -932,7 +931,6 @@ static inline struct sam_chan_s *sam_tc_initialize(int channel)
   uint32_t regval;
   uint8_t ch;
   int i;
-  int ret;
 
   /* Select the timer/counter and get the index associated with the
    * channel.

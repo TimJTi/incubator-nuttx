@@ -30,7 +30,6 @@
 #include <nuttx/analog/adc.h>
 
 #include "hardware/sam_adc.h"
-#include <nuttx/wqueue.h>
 
 #ifdef CONFIG_SAMA5_ADC
 
@@ -51,6 +50,7 @@
 /* ADC channels 0-3 or 0-4 are not available to the ADC driver if touchscreen
  * support is enabled.
  */
+
 #ifdef CONFIG_SAMA5_TSD
 #  undef CONFIG_SAMA5_ADC_CHAN0
 #  undef CONFIG_SAMA5_ADC_CHAN1
@@ -110,7 +110,6 @@ extern "C"
  ****************************************************************************/
 
 struct adc_dev_s *sam_adc_initialize(void);
-void sam_adc_shutdown(struct adc_dev_s *dev);
 
 /****************************************************************************
  * Interfaces exported from the ADC to the touchscreen driver
@@ -124,53 +123,8 @@ void sam_adc_shutdown(struct adc_dev_s *dev);
  *
  ****************************************************************************/
 
-//struct sam_adc_s;
-struct sam_adc_s
-{
-  const struct adc_callback_s *cb;
-  sem_t exclsem;         /* Supports exclusive access to the ADC interface */
-  bool initialized;      /* The ADC driver is already initialized */
-  int nopen;             /* number times this ADC peripheral's been opened*/
-  uint32_t frequency;    /* ADC clock frequency */
-
-#ifdef SAMA5_ADC_HAVE_CHANNELS
-#ifdef CONFIG_SAMA5_ADC_DMA
-  volatile bool odd;     /* Odd buffer is in use */
-  volatile bool ready;   /* Worker has completed the last set of samples */
-  volatile bool enabled; /* DMA data transfer is enabled */
-#endif
-  struct adc_dev_s *dev; /* A reference to the outer, ADC device container */
-  uint32_t pending;      /* Pending EOC events */
-  struct work_s work;    /* Supports the interrupt handling "bottom half" */
-#ifdef CONFIG_SAMA5_ADC_DMA
-  DMA_HANDLE dma;        /* Handle for DMA channel */
-#endif
-#ifdef CONFIG_SAMA5_ADC_TIOATRIG
-  TC_HANDLE tc;          /* Handle for the timer channel */
-#endif
-
-  /* DMA sample data buffer */
-
-#ifdef CONFIG_SAMA5_ADC_DMA
-  uint16_t evenbuf[SAMA5_ADC_SAMPLES];
-  uint16_t oddbuf[SAMA5_ADC_SAMPLES];
-#endif
-#endif /* SAMA5_ADC_HAVE_CHANNELS */
-
-  /* Debug stuff */
-
-#ifdef CONFIG_SAMA5_ADC_REGDEBUG
-  bool wrlast;          /* Last was a write */
-  uintptr_t addrlast;   /* Last address */
-  uint32_t vallast;     /* Last value */
-  int ntimes;           /* Number of times */
-#endif
-};
-
+struct sam_adc_s;
 int sam_adc_lock(struct sam_adc_s *priv);
-
-//void sam_cref_inc(struct sam_adc_s *priv);
-//void sam_cref_dec(struct sam_adc_s *priv);
 
 /****************************************************************************
  * Name: sam_adc_unlock

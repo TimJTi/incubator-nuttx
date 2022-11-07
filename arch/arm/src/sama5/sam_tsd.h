@@ -36,7 +36,7 @@
 
 /* Configuration ************************************************************/
 
-#ifndef CONFIG_SAMA_TSD_RXP
+#ifdef CONFIG_SAMA_TSD_RXP
 #  define CONFIG_SAMA_TSD_RXP 6
 #endif
 
@@ -94,8 +94,7 @@ extern "C"
  ****************************************************************************/
 
 struct sam_adc_s;
-//int sam_tsd_register(struct sam_adc_s *adc, int minor);
-int sam_tsd_register(struct adc_dev_s *adc, int minor);
+int sam_tsd_register(struct sam_adc_s *adc, int minor);
 
 /****************************************************************************
  * Interfaces exported from the touchscreen to the ADC driver
