@@ -36,9 +36,7 @@
 
 /* General definitions ******************************************************/
 
-#if defined (ATSAMA5D2)
-#  define SAM_ADC_NCHANNELS          12     /* 12 ADC Channels */
-#elif defined (ATSAMA5D3)
+#if defined(ATSAMA5D3)
 #  define SAM_ADC_NCHANNELS          12     /* 12 ADC Channels */
 #elif defined(ATSAMA5D4)
 #  define SAM_ADC_NCHANNELS          5      /* 5 ADC Channels */
@@ -69,9 +67,8 @@
 
 #ifdef ATSAMA5D3
 #  define SAM_ADC_CGR_OFFSET       0x0048 /* Channel Gain Register */
+#  define SAM_ADC_COR_OFFSET       0x004c /* Channel Offset Register */
 #endif
-# define SAM_ADC_COR_OFFSET       0x004c /* Channel Offset Register */
-
 
 #define SAM_ADC_CDR_OFFSET(n)      (0x0050+((n)<<2))
 #define SAM_ADC_CDR0_OFFSET        0x0050 /* Channel Data Register 0 */
@@ -122,9 +119,6 @@
 
 #ifdef ATSAMA5D3
 #  define SAM_ADC_CGR              (SAM_TSADC_VBASE+SAM_ADC_CGR_OFFSET)
-#endif
-
-#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
 #  define SAM_ADC_COR              (SAM_TSADC_VBASE+SAM_ADC_COR_OFFSET)
 #endif
 
@@ -216,16 +210,7 @@
 #    define ADC_MR_SETTLING_5      (1 << ADC_MR_SETTLING_SHIFT) /* 5 periods of ADCClock */
 #    define ADC_MR_SETTLING_9      (2 << ADC_MR_SETTLING_SHIFT) /* 9 periods of ADCClock */
 #    define ADC_MR_SETTLING_17     (3 << ADC_MR_SETTLING_SHIFT) /* 17 periods of ADCClock */
-#else
-#  define ADC_MR_SETTLING_SHIFT    (20)      /* Bits 20-21: Analog Settling Time */
-#  define ADC_MR_SETTLING_MASK     0 /* ATSAMA5D2 does not have this */
-#    define ADC_MR_SETTLING_3      (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */
-#    define ADC_MR_SETTLING_5      (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */
-#    define ADC_MR_SETTLING_9      (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */
-#    define ADC_MR_SETTLING_17     (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */
-#endif
 
-#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
 #  define ADC_MR_ANACH             (1 << 23) /* Bit 23: Analog Change */
 #endif
 
@@ -233,7 +218,7 @@
 #define ADC_MR_TRACKTIM_MASK       (15 << ADC_MR_TRACKTIM_SHIFT)
 #  define ADC_MR_TRACKTIM(n)       ((uint32_t)(n) << ADC_MR_TRACKTIM_SHIFT)
 
-#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
+#ifdef ATSAMA5D3
 #  define ADC_MR_TRANSFER_SHIFT    (28)      /* Bits 28-29: Transfer Period */
 #  define ADC_MR_TRANSFER_MASK     (3 << ADC_MR_TRANSFER_SHIFT)
 #    define ADC_MR_TRANSFER        (2 << ADC_MR_TRANSFER_SHIFT) /* Must be 2 */
@@ -274,7 +259,7 @@
 #    define ADC_SEQR1_USCH8(v)     ((uint32_t)(v) << ADC_SEQR1_USCH8_SHIFT)
 #endif
 
-#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
+#ifdef ATSAMA5D3
 /* Channel Sequence Register 2 */
 
 #  define ADC_SEQR2_USCH_SHIFT(n)  (((n)-9) << 2) /* n=9..11 */
@@ -304,7 +289,7 @@
 #define ADC_CH4                    (1 << 4)  /* Bit 4:  Channel 4 Enable */
 #define ADC_CH5                    (1 << 5)  /* Bit 5:  Channel 5 Enable */
 
-#if defined (ATSAMA5D3) || defined (ATSAMA5D2)
+#ifdef ATSAMA5D3
 #  define ADC_CH6                  (1 << 6)  /* Bit 6:  Channel 6 Enable */
 #  define ADC_CH7                  (1 << 7)  /* Bit 7:  Channel 7 Enable */
 #  define ADC_CH8                  (1 << 8)  /* Bit 8:  Channel 8 Enable */
@@ -316,7 +301,7 @@
 #define TSD_4WIRE_ALL              (0x0000000f)
 #define TSD_5WIRE_ALL              (0x0000001f)
 
-#if defined(ATSAMA5D3) || defined (ATSAMA5D2)
+#if defined(ATSAMA5D3)
 #  define ADC_CHALL                (0x00000fff)
 #elif defined(ATSAMA5D4)
 #  define ADC_CHALL                (0x0000001f)
@@ -342,7 +327,7 @@
 #define ADC_INT_EOC3               (1 << 3)  /* Bit 3:  End of Conversion 3 */
 #define ADC_INT_EOC4               (1 << 4)  /* Bit 4:  End of Conversion 4 */
 
-#if defined(ATSAMA5D3) || defined (ATSAMA5D2)
+#if defined(ATSAMA5D3)
 #  define ADC_INT_EOC5             (1 << 5)  /* Bit 5:  End of Conversion 5 */
 #  define ADC_INT_EOC6             (1 << 6)  /* Bit 6:  End of Conversion 6 */
 #  define ADC_INT_EOC7             (1 << 7)  /* Bit 7:  End of Conversion 7 */
@@ -370,11 +355,8 @@
 #define ADC_INT_NOPEN              (1 << 30) /* Bit 30: No Pen Contact Interrupt */
 #define ADC_SR_PENS                (1 << 31) /* Bit 31: Pen detect Status (SR only) */
 
-#ifdef ATSAMA5D3
 #define ADC_INT_ALL                (0xe7f00fff)
-#elif ATSAMA5D2
-#define ADC_INT_ALL                (0x67780fff)
-#endif
+
 /* Overrun Status Register */
 
 #define ADC_OVER_OVRE(n)           (1 << (n))
