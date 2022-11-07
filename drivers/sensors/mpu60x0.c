@@ -694,6 +694,7 @@ static int mpu_reset(FAR struct mpu_dev_s *dev)
   ret = __mpu_write_pwr_mgmt_1(dev, PWR_MGMT_1__DEVICE_RESET);
   if (ret != OK)
     {
+      mpu_unlock(dev);
       snerr("Could not find mpu60x0!\n");
       return ret;
     }
@@ -973,7 +974,6 @@ int mpu60x0_register(FAR const char *path, FAR struct mpu_config_s *config)
       snerr("ERROR: Failed to configure mpu60x0: %d\n", ret);
 
       nxmutex_destroy(&priv->lock);
-
       kmm_free(priv);
       return ret;
     }
@@ -986,7 +986,6 @@ int mpu60x0_register(FAR const char *path, FAR struct mpu_config_s *config)
       snerr("ERROR: Failed to register mpu60x0 interface: %d\n", ret);
 
       nxmutex_destroy(&priv->lock);
-
       kmm_free(priv);
       return ret;
     }
