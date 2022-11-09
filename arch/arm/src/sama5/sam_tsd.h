@@ -36,7 +36,7 @@
 
 /* Configuration ************************************************************/
 
-#ifdef CONFIG_SAMA_TSD_RXP
+#ifndef CONFIG_SAMA_TSD_RXP
 #  define CONFIG_SAMA_TSD_RXP 6
 #endif
 

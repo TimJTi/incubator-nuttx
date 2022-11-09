@@ -137,6 +137,18 @@
 #  define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
+#ifndef BOARD_TSSCTIM
+# define BOARD_TSSCTIM 0
+#endif
+
+#ifndef BOARD_TSD_PENDETSENS
+# define BOARD_TSD_PENDETSENS 0
+#endif
+
+#if !defined BOARD_TSD_IBCTL && defined ATSAMA5D2
+# define BOARD_TSD_IBCTL 0
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -269,7 +281,7 @@ static void sam_tsd_notify(struct sam_tsd_s *priv)
    * that the read data is available.
    */
 
-  if (priv->nwaiters > 0)
+  if (priv->nwaiters > 0) 
     {
       /* After posting this semaphore, we need to exit because the
        * touchscreen is no longer available.
@@ -455,9 +467,11 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
         {
           /* Set TSFREQ = TSAV */
 
-          regval &= ~ADC_TSMR_TSFREQ_MASK;
-          regval |=  ADC_TSMR_TSFREQ(minfreq);
+          tsfreq = minfreq;
         }
+
+        regval &= ~ADC_TSMR_TSFREQ_MASK;
+        regval |=  ADC_TSMR_TSFREQ(minfreq);
     }
 
   /* Save the new filter value */
@@ -604,6 +618,13 @@ static void sam_tsd_bottomhalf(void *arg)
           /* But don't enable interrupts for the data that we already have */
 
           ier &= ~(pending & TSD_ALLREADY);
+
+          /* Configure for periodic trigger */
+
+          regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
+          regval &= ~ADC_TRGR_TRGMOD_MASK;
+          regval |= ADC_TRGR_TRGMOD_PERIOD;
+          sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
           goto ignored;
         }
 
@@ -1509,12 +1530,17 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   regval |= ADC_TSMR_TSMODE_4WIRE;
 #endif
 
+  regval &= ~ADC_TSMR_TSSCTIM_MASK;
+  regval |= ADC_TSMR_TSSCTIM(BOARD_TSSCTIM);
+
   sam_adc_putreg(priv->adc, SAM_ADC_TSMR, regval);
 
   /* Disable averaging */
 
   sam_tsd_setaverage(priv, ADC_TSMR_TSAV_NOFILTER);
 
+#if 0
+  /* already done, above */
   /* Select 4-wire w/pressure, 4-wire w/o pressure, or 5 wire modes */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
@@ -1526,6 +1552,7 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   regval |= ADC_TSMR_TSMODE_4WIRENPM;
 #else /* if defined(CONFIG_SAMA5_TSD_4WIRE) */
   regval |= ADC_TSMR_TSMODE_4WIRE;
+#endif
 #endif
 
   /* Disable all TSD-related interrupts */
@@ -1546,12 +1573,24 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 
   /* Enable pen contact detection */
 
+  regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
   regval |= ADC_TSMR_PENDET;
   sam_adc_putreg(priv->adc, SAM_ADC_TSMR, regval);
 
   /* Set up pen debounce time */
 
   sam_tsd_debounce(priv, BOARD_TSD_DEBOUNCE);
+
+  /* configure pen sensitivity */
+
+  regval = sam_adc_getreg(priv->adc, SAM_ADC_ACR);
+  regval &= ~ADC_ACR_PENDETSENS_MASK;
+  regval |= ADC_ACR_PENDETSENS(BOARD_TSD_PENDETSENS);
+#if defined ATSAMA5D2
+  regval &= ~ADC_ACR_IBCTL_MASK;
+  regval |= ADC_ACR_IBCTL(BOARD_TSD_IBCTL);
+#endif
+  sam_adc_putreg(priv->adc, SAM_ADC_ACR, regval);
 
   /* Configure pen interrupt generation */
 
@@ -1561,6 +1600,11 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
 
   sam_adc_putreg(priv->adc, SAM_ADC_IER, ADC_INT_PEN);
+
+  /* perform a ts calibration */
+  regval = ADC_CR_TSCALIB | ADC_CR_START;
+  sam_adc_putreg(priv->adc, SAM_ADC_CR, regval);
+  
 }
 
 /****************************************************************************
@@ -1651,7 +1695,7 @@ int sam_tsd_register(struct sam_adc_s *adc, int minor)
   /* Initialize the touchscreen device driver instance */
 
   memset(priv, 0, sizeof(struct sam_tsd_s));
-  priv->adc     = adc->dev;          /* Save the ADC device handle */
+  priv->adc     = adc;          /* Save the ADC device handle */
   priv->threshx = INVALID_THRESHOLD; /* Initialize thresholding logic */
   priv->threshy = INVALID_THRESHOLD; /* Initialize thresholding logic */
   nxsem_init(&priv->waitsem, 0, 0);

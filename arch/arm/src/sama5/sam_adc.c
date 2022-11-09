@@ -856,7 +856,7 @@ static void sam_adc_endconversion(void *arg)
   int ret;
 
   DEBUGASSERT(priv != NULL);
-  ainfo("pending=%08x\n", priv->pending);
+  ainfo("pending=%08lx\n", priv->pending);
 
   /* Get the set of unmasked, pending ADC interrupts */
 
@@ -1060,7 +1060,10 @@ static void sam_adc_reset(struct adc_dev_s *dev)
 
   /* Reset gain, offset, differential modes */
 
+#if defined (ATSAMA5D3)
   sam_adc_putreg(priv, SAM_ADC_CGR, 0);
+  #endif
+  
   sam_adc_putreg(priv, SAM_ADC_COR, 0);
 
 #ifndef CONFIG_SAMA5_ADC_SWTRIG
@@ -1092,6 +1095,7 @@ static int sam_adc_setup(struct adc_dev_s *dev)
 {
   struct sam_adc_s *priv = (struct sam_adc_s *)dev->ad_priv;
   uint32_t regval;
+  int ret;
 
   ainfo("Setup\n");
 
@@ -1144,6 +1148,10 @@ static int sam_adc_setup(struct adc_dev_s *dev)
 
 #endif
 
+  /* Now we are initialized */
+
+  priv->initialized = true;
+
   /* Configure trigger mode and start conversion */
 
   return sam_adc_trigger(priv);
@@ -1167,7 +1175,7 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
   ainfo("Shutdown\n");
 
   /* Reset the ADC peripheral */
-
+#if 0
   sam_adc_reset(dev);
 
   /* Disable ADC interrupts at the level of the AIC */
@@ -1177,6 +1185,7 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
   /* Then detach the ADC interrupt handler. */
 
   irq_detach(SAM_IRQ_ADC);
+#endif
 }
 
 /****************************************************************************
@@ -1665,7 +1674,8 @@ static void sam_adc_offset(struct sam_adc_s *priv)
 
 static void sam_adc_gain(struct sam_adc_s *priv)
 {
-#ifdef CONFIG_SAMA5_ADC_ANARCH
+#ifdef ATSAMA5D3
+#  ifdef CONFIG_SAMA5_ADC_ANARCH
   uint32_t regval;
 
   ainfo("Entry\n");
@@ -1719,7 +1729,8 @@ static void sam_adc_gain(struct sam_adc_s *priv)
   /* Set GAIN0 only.  GAIN0 will be used for all channels. */
 
   sam_adc_putreg(priv, SAM_ADC_CGR, ADC_CGR_GAIN0(CONFIG_SAMA5_ADC_GAIN));
-#endif
+#endif /* CONFIG_SAMA5_ADC_ANARCH */
+#endif /* ATSAMA5D3 */
 }
 
 /****************************************************************************
@@ -2131,6 +2142,9 @@ struct adc_dev_s *sam_adc_initialize(void)
                 ADC_MR_SETTLING_MASK);
       regval |= (ADC_MR_STARTUP_512 | ADC_MR_TRACKTIM(0) |
                 ADC_MR_SETTLING_17);
+#if defined ATSAMA5D2
+      regval |= ADC_MR_TRANSFER;
+#endif
       sam_adc_putreg(priv, SAM_ADC_MR, regval);
 
       /* Attach the ADC interrupt */
@@ -2153,6 +2167,7 @@ struct adc_dev_s *sam_adc_initialize(void)
       /* Now we are initialized */
 
       priv->initialized = true;
+    
     }
 
   /* Return a pointer to the device structure */
