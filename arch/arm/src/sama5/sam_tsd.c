@@ -456,6 +456,7 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
    */
 
   minfreq = (tsav >> ADC_TSMR_TSAV_SHIFT);
+
   if (minfreq)
     {
       /* TSFREQ: Defines the Touchscreen Frequency compared to the Trigger
@@ -619,17 +620,39 @@ static void sam_tsd_bottomhalf(void *arg)
 
           ier &= ~(pending & TSD_ALLREADY);
 
-          /* Configure for periodic trigger */
+          /* datasheet suggests that if TSAV != 0 there may not be interrupts
+           * for the TS channels so periodic or continuous triggers are needed.
+           *  
+           * Testing suggests otherwise, so periodic is used regardless.
+           */
+#if 0
+          regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
+          regval &= ADC_TSMR_TSAV_MASK;
+          if ((regval & ADC_TSMR_TSAV_MASK) != 0)
+#endif
+            {
+              regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
 
-          regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
-          regval &= ~ADC_TRGR_TRGMOD_MASK;
-          regval |= ADC_TRGR_TRGMOD_PERIOD;
-          sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+              if ((regval & ADC_TRGR_TRGMOD_MASK) == ADC_TRGR_TRGMOD_PEN)
+                {
+                   /* Configure for periodic trigger */
+                  regval &= ~ADC_TRGR_TRGMOD_MASK;
+                  regval |= ADC_TRGR_TRGMOD_PERIOD;
+                  sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+                }
+              else
+                {
+                  regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
+                  regval &= ~ADC_TRGR_TRGMOD_MASK;
+                  regval |= ADC_TRGR_TRGMOD_PEN;
+                  sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);              
+                }
+            }
           goto ignored;
         }
 
       /* Sample positional values.  Get raw X and Y position data */
-
+      
       regval = sam_adc_getreg(priv->adc, SAM_ADC_XPOSR);
       xraw   = (regval & ADC_XPOSR_XPOS_MASK) >> ADC_XPOSR_XPOS_SHIFT;
       xscale = (regval & ADC_XPOSR_XSCALE_MASK) >> ADC_XPOSR_XSCALE_SHIFT;
@@ -646,7 +669,7 @@ static void sam_tsd_bottomhalf(void *arg)
       pressr = sam_adc_getreg(priv->adc, SAM_ADC_PRESSR);
 #endif
       /* Discard any bad readings.  This check may not be necessary. */
-
+#if 1
       if (xraw == 0 || xraw >= xscale || yraw == 0 || yraw > yscale)
         {
           iwarn("WARNING: Discarding: x %" PRId32 ":%" PRId32
@@ -655,7 +678,7 @@ static void sam_tsd_bottomhalf(void *arg)
                 yraw, yscale);
           goto ignored;
         }
-
+#endif
       /* Scale the X/Y measurements.  The scale value is the maximum
        * value that the sample can attain.  It should be close to 4095.
        * Scaling:
@@ -672,6 +695,7 @@ static void sam_tsd_bottomhalf(void *arg)
       y  = ((yraw << 12) - yraw) / yscale;
 #endif
 
+      //x = 4096 - x;
       /* Perform a thresholding operation so that the results will be
        * more stable.  If the difference from the last sample is small,
        * then ignore the event. REVISIT:  Should a large change in
@@ -720,14 +744,24 @@ static void sam_tsd_bottomhalf(void *arg)
        * resistance (Rxp). Three conversions (Xpos, Z1, Z2) are
        * necessary to determine the value of Rp (Zaxis resistance).
        *
-       *   Rp = Rxp * (Xraw / 1024) * [(Z2 / Z1) - 1]
+       *   Rp = Rxp * (X / 1024) * [(Z2 / Z1) - 1]
+       * 
+       * Revisited - 
        */
 
       z2 = (pressr & ADC_PRESSR_Z2_MASK) >> ADC_PRESSR_Z2_SHIFT;
       z1 = (pressr & ADC_PRESSR_Z1_MASK) >> ADC_PRESSR_Z1_SHIFT;
-      p  = CONFIG_SAMA_TSD_RXP * xraw * (z2 - z1) / z1;
+      
+      if (z1 != 0)
+        {
+          p = CONFIG_SAMA_TSD_RXP * xraw * (z2 - z1) / (z1 * 4096);
+        }
+      else
+        {
+          p = 4096;
+        }
 
-      priv->sample.p = MIN(p, UINT16_MAX);
+      priv->sample.p = MIN(p, 4096);
 #endif
 
       /* The X/Y positional data is now valid */
@@ -1218,67 +1252,67 @@ static void sam_tsd_startuptime(struct sam_tsd_s *priv, uint32_t time)
 
   if (startup > 896)
     {
-      regval = ADC_MR_STARTUP_960;
+      regval |= ADC_MR_STARTUP_960;
     }
   else if (startup > 832)
     {
-      regval = ADC_MR_STARTUP_896;
+      regval |= ADC_MR_STARTUP_896;
     }
   else if (startup > 768)
     {
-      regval = ADC_MR_STARTUP_832;
+      regval |= ADC_MR_STARTUP_832;
     }
   else if (startup > 704)
     {
-      regval = ADC_MR_STARTUP_768;
+      regval |= ADC_MR_STARTUP_768;
     }
   else if (startup > 640)
     {
-      regval = ADC_MR_STARTUP_704;
+      regval |= ADC_MR_STARTUP_704;
     }
   else if (startup > 576)
     {
-      regval = ADC_MR_STARTUP_640;
+      regval |= ADC_MR_STARTUP_640;
     }
   else if (startup > 512)
     {
-      regval = ADC_MR_STARTUP_576;
+      regval |= ADC_MR_STARTUP_576;
     }
   else if (startup > 112)
     {
-      regval = ADC_MR_STARTUP_512;
+      regval |= ADC_MR_STARTUP_512;
     }
   else if (startup > 96)
     {
-      regval = ADC_MR_STARTUP_112;
+      regval |= ADC_MR_STARTUP_112;
     }
   else if (startup > 80)
     {
-      regval = ADC_MR_STARTUP_96;
+      regval |= ADC_MR_STARTUP_96;
     }
   else if (startup > 64)
     {
-      regval = ADC_MR_STARTUP_80;
+      regval |= ADC_MR_STARTUP_80;
     }
   else if (startup > 24)
     {
-      regval = ADC_MR_STARTUP_64;
+      regval |= ADC_MR_STARTUP_64;
     }
   else if (startup > 16)
     {
-      regval = ADC_MR_STARTUP_24;
+      regval |= ADC_MR_STARTUP_24;
     }
   else if (startup > 8)
     {
-      regval = ADC_MR_STARTUP_16;
+      regval |= ADC_MR_STARTUP_16;
     }
   else if (startup > 0)
     {
-      regval = ADC_MR_STARTUP_8;
+      regval |= ADC_MR_STARTUP_8;
     }
   else
     {
-      regval = ADC_MR_STARTUP_0;
+      regval |= ADC_MR_STARTUP_0;
     }
 
   sam_adc_putreg(priv->adc, SAM_ADC_MR, regval);
@@ -1307,6 +1341,9 @@ static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time)
   uint32_t tracktim;
   uint32_t regval;
 
+#if defined (ATSAMA5D4)
+
+
   /* Formula for SHTIM is:
    *
    *  TRACKTIM     = (TrackingTime * ADCCLK) / (1000000000) - 1
@@ -1334,7 +1371,11 @@ static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time)
           tracktim--;
         }
     }
-
+#elif defined (ATSAMA5D3)
+  tracktim = 0;
+#else /* ATSAMA5D2*/
+  tracktim = MAX(time, 15);
+#endif
   /* Set the neew TRACKTIM field value int he ADC MR register */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_MR);
@@ -1539,22 +1580,6 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 
   sam_tsd_setaverage(priv, ADC_TSMR_TSAV_NOFILTER);
 
-#if 0
-  /* already done, above */
-  /* Select 4-wire w/pressure, 4-wire w/o pressure, or 5 wire modes */
-
-  regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
-  regval &= ~ADC_TSMR_TSMODE_MASK;
-
-#if defined(CONFIG_SAMA5_TSD_5WIRE)
-  regval |= ADC_TSMR_TSMODE_5WIRE;
-#elif defined(CONFIG_SAMA5_TSD_4WIRENPM)
-  regval |= ADC_TSMR_TSMODE_4WIRENPM;
-#else /* if defined(CONFIG_SAMA5_TSD_4WIRE) */
-  regval |= ADC_TSMR_TSMODE_4WIRE;
-#endif
-#endif
-
   /* Disable all TSD-related interrupts */
 
   sam_adc_putreg(priv->adc, SAM_ADC_IDR, ADC_TSD_ALLINTS);
@@ -1604,6 +1629,8 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   /* perform a ts calibration */
   regval = ADC_CR_TSCALIB | ADC_CR_START;
   sam_adc_putreg(priv->adc, SAM_ADC_CR, regval);
+
+  up_enable_irq(SAM_IRQ_ADC);
   
 }
 
