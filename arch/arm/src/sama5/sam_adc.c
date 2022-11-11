@@ -1425,6 +1425,35 @@ static int sam_adc_trigger(struct sam_adc_s *priv)
   regval |= ADC_TRGR_TRGMOD_NOTRIG;
   sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
 
+#elif defined(CONFIG_SAMA5_ADC_PERIODIC_TRIG)
+  ainfo("Setup Periodic Trigger\n");
+
+  regval  = sam_adc_getreg(priv, SAM_ADC_MR);
+  regval &= ~ADC_MR_TRGSEL_MASK;
+  sam_adc_putreg(priv, SAM_ADC_MR, regval);
+
+  /* Configure the trigger to be periodic*/
+
+  regval  = sam_adc_getreg(priv, SAM_ADC_TRGR);
+  regval &= ~ADC_TRGR_TRGMOD_MASK;
+  regval |= ADC_TRGR_TRGMOD_PERIOD;
+  regval |= ADC_TRGR_TRGPER(CONFIG_SAMA5_ADC_TRIGGER_PERIOD-1);
+  sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
+
+#elif defined(CONFIG_SAMA5_ADC_CONTINUOUS_TRIG)
+  ainfo("Setup Continuous Trigger\n");
+
+  regval  = sam_adc_getreg(priv, SAM_ADC_MR);
+  regval &= ~ADC_MR_TRGSEL_MASK;
+  sam_adc_putreg(priv, SAM_ADC_MR, regval);
+
+  /* Configure the trigger to be continuous*/
+
+  regval  = sam_adc_getreg(priv, SAM_ADC_TRGR);
+  regval &= ~ADC_TRGR_TRGMOD_MASK;
+  regval |= ADC_TRGR_TRGMOD_CONT;
+  sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
+
 #elif defined(CONFIG_SAMA5_ADC_ADTRG)
   ainfo("Setup ADTRG trigger\n");
 
@@ -1451,6 +1480,7 @@ static int sam_adc_trigger(struct sam_adc_s *priv)
 #endif
 
   sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
+
 
 #elif defined(CONFIG_SAMA5_ADC_TIOATRIG)
   ainfo("Setup timer/counter trigger\n");

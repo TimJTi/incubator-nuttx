@@ -4493,6 +4493,16 @@ config SAMA5_ADC_SWTRIG
 	---help---
 		A-to-D Conversion is initiated only by software via an ioctl()
 
+config SAMA5_ADC_PERIODIC_TRIG
+	bool "Periodic trigger"
+	---help---
+		A-to-D Conversion is triggered periodically
+
+config SAMA5_ADC_CONTINUOUS_TRIG
+	bool "Continuous trigger"
+	---help---
+		A-to-D Conversion is continuous
+
 config SAMA5_ADC_ADTRG
 	bool "External trigger via the ADTRG pin"
 	---help---
@@ -4590,6 +4600,19 @@ config SAMA5_ADC_TIOA_BOTH
 
 endchoice # ADTRG edge
 endif # SAMA5_ADC_TIOATRIG
+
+if SAMA5_ADC_PERIODIC_TRIG
+
+config SAMA5_ADC_TRIGGER_PERIOD
+	int "ADC Periodic Trigger Rate"
+  range 1 65536
+	default 10000
+	---help---
+    This setting determines the periodic trigger rate for sampling.
+    The trigger period = Rate/ADCCLK.
+
+endif # SAMA5_ADC_TRIGGER_PERIOD
+
 endmenu # ADC Trigger Selection
 endif # SAMA5_ADC_HAVE_CHAN
 
