@@ -88,6 +88,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+
 /* Count the number of channels in use */
 
 #define SAMA5_CHAN0_INUSE    0
@@ -1177,6 +1178,9 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
   /* Reset the ADC peripheral */
 #ifndef CONFIG_SAMA5_TSD
   /* doing this if the TSD is required will stop it working */
+
+  /* Needs revisit */
+  
   sam_adc_reset(dev);
 
   /* Disable ADC interrupts at the level of the AIC */
