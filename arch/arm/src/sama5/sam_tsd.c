@@ -883,7 +883,6 @@ static int sam_tsd_open(struct file *filep)
   /* Get exclusive access to the device structures */
 
   sam_adc_lock(priv->adc);
-
   /* Increment the count of references to the device.  If this the first
    * time that the driver has been opened for this device, then initialize
    * the device.

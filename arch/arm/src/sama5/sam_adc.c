@@ -1175,7 +1175,8 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
   ainfo("Shutdown\n");
 
   /* Reset the ADC peripheral */
-#if 0
+#ifndef CONFIG_SAMA5_TSD
+  /* doing this if the TSD is required will stop it working */
   sam_adc_reset(dev);
 
   /* Disable ADC interrupts at the level of the AIC */
