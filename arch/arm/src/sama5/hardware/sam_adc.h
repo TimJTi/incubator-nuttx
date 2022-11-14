@@ -190,13 +190,13 @@
 #  define ADC_MR_PRESCAL(n)        ((uint32_t)(n) << ADC_MR_PRESCAL_SHIFT)
 #define ADC_MR_STARTUP_SHIFT       (16)      /* Bits 16-19: Start Up Time */
 #define ADC_MR_STARTUP_MASK        (15 << ADC_MR_STARTUP_SHIFT)
-#  define ADC_MR_STARTUP_0         (0 << ADC_MR_STARTUP_SHIFT)  /* 0 periods of ADCClock */
-#  define ADC_MR_STARTUP_8         (1 << ADC_MR_STARTUP_SHIFT)  /* 8 periods of ADCClock */
-#  define ADC_MR_STARTUP_16        (2 << ADC_MR_STARTUP_SHIFT)  /* 16 periods of ADCClock */
-#  define ADC_MR_STARTUP_24        (3 << ADC_MR_STARTUP_SHIFT)  /* 24 periods of ADCClock */
-#  define ADC_MR_STARTUP_64        (4 << ADC_MR_STARTUP_SHIFT)  /* 64 periods of ADCClock */
-#  define ADC_MR_STARTUP_80        (5 << ADC_MR_STARTUP_SHIFT)  /* 80 periods of ADCClock */
-#  define ADC_MR_STARTUP_96        (6 << ADC_MR_STARTUP_SHIFT)  /* 96 periods of ADCClock */
+#  define ADC_MR_STARTUP_0         (0 << ADC_MR_STARTUP_SHIFT)  /* 0 periods of ADCClock   */
+#  define ADC_MR_STARTUP_8         (1 << ADC_MR_STARTUP_SHIFT)  /* 8 periods of ADCClock   */
+#  define ADC_MR_STARTUP_16        (2 << ADC_MR_STARTUP_SHIFT)  /* 16 periods of ADCClock  */
+#  define ADC_MR_STARTUP_24        (3 << ADC_MR_STARTUP_SHIFT)  /* 24 periods of ADCClock  */
+#  define ADC_MR_STARTUP_64        (4 << ADC_MR_STARTUP_SHIFT)  /* 64 periods of ADCClock  */
+#  define ADC_MR_STARTUP_80        (5 << ADC_MR_STARTUP_SHIFT)  /* 80 periods of ADCClock  */
+#  define ADC_MR_STARTUP_96        (6 << ADC_MR_STARTUP_SHIFT)  /* 96 periods of ADCClock  */
 #  define ADC_MR_STARTUP_112       (7 << ADC_MR_STARTUP_SHIFT)  /* 112 periods of ADCClock */
 #  define ADC_MR_STARTUP_512       (8 << ADC_MR_STARTUP_SHIFT)  /* 512 periods of ADCClock */
 #  define ADC_MR_STARTUP_576       (9 << ADC_MR_STARTUP_SHIFT)  /* 576 periods of ADCClock */
@@ -208,15 +208,15 @@
 #  define ADC_MR_STARTUP_960       (15 << ADC_MR_STARTUP_SHIFT) /* 960 periods of ADCClock */
 
 #ifdef ATSAMA5D3
-#  define ADC_MR_SETTLING_SHIFT    (20)      /* Bits 20-21: Analog Settling Time */
+#  define ADC_MR_SETTLING_SHIFT    (20)      /* Bits 20-21: Analog Settling Time           */
 #  define ADC_MR_SETTLING_MASK     (15 << ADC_MR_SETTLING_SHIFT)
-#    define ADC_MR_SETTLING_3      (0 << ADC_MR_SETTLING_SHIFT) /* 3 periods of ADCClock */
-#    define ADC_MR_SETTLING_5      (1 << ADC_MR_SETTLING_SHIFT) /* 5 periods of ADCClock */
-#    define ADC_MR_SETTLING_9      (2 << ADC_MR_SETTLING_SHIFT) /* 9 periods of ADCClock */
-#    define ADC_MR_SETTLING_17     (3 << ADC_MR_SETTLING_SHIFT) /* 17 periods of ADCClock */
+#    define ADC_MR_SETTLING_3      (0 << ADC_MR_SETTLING_SHIFT) /* 3 periods of ADCClock   */
+#    define ADC_MR_SETTLING_5      (1 << ADC_MR_SETTLING_SHIFT) /* 5 periods of ADCClock   */
+#    define ADC_MR_SETTLING_9      (2 << ADC_MR_SETTLING_SHIFT) /* 9 periods of ADCClock   */
+#    define ADC_MR_SETTLING_17     (3 << ADC_MR_SETTLING_SHIFT) /* 17 periods of ADCClock  */
 #else
-#  define ADC_MR_SETTLING_SHIFT    (20)      /* Bits 20-21: Analog Settling Time */
-#  define ADC_MR_SETTLING_MASK     0 /* ATSAMA5D2 does not have this */
+#  define ADC_MR_SETTLING_SHIFT    (20)      /* Not present in SAMA5D2 or SAMA5D4          */
+#  define ADC_MR_SETTLING_MASK     (0)
 #    define ADC_MR_SETTLING_3      (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */
 #    define ADC_MR_SETTLING_5      (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */
 #    define ADC_MR_SETTLING_9      (0 << ADC_MR_SETTLING_SHIFT) /* n/a periods of ADCClock */

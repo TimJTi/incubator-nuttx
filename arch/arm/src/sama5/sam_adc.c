@@ -88,7 +88,6 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-
 /* Count the number of channels in use */
 
 #define SAMA5_CHAN0_INUSE    0
@@ -476,6 +475,7 @@ static void sam_adc_gain(struct sam_adc_s *priv);
 static void sam_adc_analogchange(struct sam_adc_s *priv);
 static void sam_adc_sequencer(struct sam_adc_s *priv);
 static void sam_adc_channels(struct sam_adc_s *priv);
+static void sam_adc_trigperiod(struct sam_adc_s *priv, uint32_t period);
 #endif
 
 /****************************************************************************
@@ -827,6 +827,75 @@ static int sam_adc_dmasetup(struct sam_adc_s *priv, uint8_t *buffer,
 #endif
 
 /****************************************************************************
+ * Name: sam_tsd_trigperiod
+ *
+ * Description:
+ *   Set the TGPER field of the TRGR register in order to define a periodic
+ *   trigger perioc.
+ *
+ *     Trigger Period = (TRGPER+1) / ADCCLK
+ *
+ * Input Parameters:
+ *   priv - A reference to the touchscreen device structure
+ *   time - The new trigger period in microseconds
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+static void sam_adc_trigperiod(struct sam_adc_s *priv, uint32_t period)
+{
+  uint32_t trigper;
+  uint32_t regval;
+  uint32_t div;
+
+  /* Divide trigger period avoid overflows.  Division by ten is awkard, but
+   * appropriate here because times are specified in decimal with lots of
+   * zeroes.
+   */
+
+  div = 100000;
+  while (period >= 10 && div >= 10)
+    {
+      period /= 10;
+      div    /= 10;
+    }
+
+  /* Calculate and adjust the scaled trigger period:
+   *
+   *   Trigger Period = (TRGPER+1) / ADCCLK
+   */
+
+  trigper = (period * BOARD_ADCCLK_FREQUENCY) / div;
+  if ((trigper % 10) != 0)
+    {
+      /* Handle partial values by not decrementing trigper.  This is
+       * basically a 'ceil' operation.
+       */
+
+      trigper /= 10;
+    }
+  else
+    {
+      /* The final value needs to be decrement by one */
+
+      trigper /= 10;
+      if (trigper > 0)
+        {
+          trigper--;
+        }
+    }
+
+  /* Set the calculated trigger period in the TRGR register */
+
+  regval  = sam_adc_getreg(priv, SAM_ADC_TRGR);
+  regval &= ~ADC_TRGR_TRGPER_MASK;
+  regval |=  ADC_TRGR_TRGPER(trigper);
+  sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
+}
+
+/****************************************************************************
  * ADC interrupt handling
  ****************************************************************************/
 
@@ -1064,10 +1133,10 @@ static void sam_adc_reset(struct adc_dev_s *dev)
 #if defined (ATSAMA5D3)
   sam_adc_putreg(priv, SAM_ADC_CGR, 0);
   #endif
-  
+
   sam_adc_putreg(priv, SAM_ADC_COR, 0);
 
-#ifndef CONFIG_SAMA5_ADC_SWTRIG
+#if !defined CONFIG_SAMA5_ADC_SWTRIG && !defined CONFIG_SAMA5_TSD
   /* Select software trigger (i.e., basically no trigger) */
 
   regval  = sam_adc_getreg(priv, SAM_ADC_MR);
@@ -1176,12 +1245,13 @@ static void sam_adc_shutdown(struct adc_dev_s *dev)
   ainfo("Shutdown\n");
 
   /* Reset the ADC peripheral */
+
+  sam_adc_reset(dev);
+
 #ifndef CONFIG_SAMA5_TSD
   /* doing this if the TSD is required will stop it working */
 
   /* Needs revisit */
-  
-  sam_adc_reset(dev);
 
   /* Disable ADC interrupts at the level of the AIC */
 
@@ -1432,16 +1502,17 @@ static int sam_adc_trigger(struct sam_adc_s *priv)
 #elif defined(CONFIG_SAMA5_ADC_PERIODIC_TRIG)
   ainfo("Setup Periodic Trigger\n");
 
+  /* Configure the trigger to be periodic */
+
   regval  = sam_adc_getreg(priv, SAM_ADC_MR);
   regval &= ~ADC_MR_TRGSEL_MASK;
   sam_adc_putreg(priv, SAM_ADC_MR, regval);
 
-  /* Configure the trigger to be periodic*/
+  sam_adc_trigperiod(priv, CONFIG_SAMA5_ADC_TRIGGER_PERIOD);
 
   regval  = sam_adc_getreg(priv, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGMOD_MASK;
   regval |= ADC_TRGR_TRGMOD_PERIOD;
-  regval |= ADC_TRGR_TRGPER(CONFIG_SAMA5_ADC_TRIGGER_PERIOD-1);
   sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
 
 #elif defined(CONFIG_SAMA5_ADC_CONTINUOUS_TRIG)
@@ -1451,7 +1522,7 @@ static int sam_adc_trigger(struct sam_adc_s *priv)
   regval &= ~ADC_MR_TRGSEL_MASK;
   sam_adc_putreg(priv, SAM_ADC_MR, regval);
 
-  /* Configure the trigger to be continuous*/
+  /* Configure the trigger to be continuous */
 
   regval  = sam_adc_getreg(priv, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGMOD_MASK;
@@ -1484,7 +1555,6 @@ static int sam_adc_trigger(struct sam_adc_s *priv)
 #endif
 
   sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
-
 
 #elif defined(CONFIG_SAMA5_ADC_TIOATRIG)
   ainfo("Setup timer/counter trigger\n");
@@ -2202,7 +2272,6 @@ struct adc_dev_s *sam_adc_initialize(void)
       /* Now we are initialized */
 
       priv->initialized = true;
-    
     }
 
   /* Return a pointer to the device structure */

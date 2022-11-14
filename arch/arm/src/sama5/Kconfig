@@ -4604,12 +4604,10 @@ endif # SAMA5_ADC_TIOATRIG
 if SAMA5_ADC_PERIODIC_TRIG
 
 config SAMA5_ADC_TRIGGER_PERIOD
-	int "ADC Periodic Trigger Rate"
-  range 1 65536
-	default 10000
+	int "ADC Periodic Trigger Rate, useconds"
+	default 50000
 	---help---
-    This setting determines the periodic trigger rate for sampling.
-    The trigger period = Rate/ADCCLK.
+    This setting determines the periodic sample trigger rate in useconds.
 
 endif # SAMA5_ADC_TRIGGER_PERIOD
 

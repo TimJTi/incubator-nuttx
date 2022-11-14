@@ -281,7 +281,7 @@ static void sam_tsd_notify(struct sam_tsd_s *priv)
    * that the read data is available.
    */
 
-  if (priv->nwaiters > 0) 
+  if (priv->nwaiters > 0)
     {
       /* After posting this semaphore, we need to exit because the
        * touchscreen is no longer available.
@@ -575,10 +575,12 @@ static void sam_tsd_bottomhalf(void *arg)
       sam_tsd_setaverage(priv, ADC_TSMR_TSAV_NOFILTER);
       sam_tsd_debounce(priv, BOARD_TSD_DEBOUNCE);
 
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
       regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
       regval &= ~ADC_TRGR_TRGMOD_MASK;
       regval |= ADC_TRGR_TRGMOD_PEN;
       sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+#endif
     }
 
   /* It is a pen down event.  If the last loss-of-contact event has not been
@@ -621,8 +623,8 @@ static void sam_tsd_bottomhalf(void *arg)
           ier &= ~(pending & TSD_ALLREADY);
 
           /* datasheet suggests that if TSAV != 0 there may not be interrupts
-           * for the TS channels so periodic or continuous triggers are needed.
-           *  
+           * for TSD channels so periodic or continuous triggers are needed
+           *
            * Testing suggests otherwise, so periodic is used regardless.
            */
 #if 0
@@ -630,12 +632,14 @@ static void sam_tsd_bottomhalf(void *arg)
           regval &= ADC_TSMR_TSAV_MASK;
           if ((regval & ADC_TSMR_TSAV_MASK) != 0)
 #endif
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
             {
               regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
 
               if ((regval & ADC_TRGR_TRGMOD_MASK) == ADC_TRGR_TRGMOD_PEN)
                 {
-                   /* Configure for periodic trigger */
+                  /* Configure for periodic trigger */
+
                   regval &= ~ADC_TRGR_TRGMOD_MASK;
                   regval |= ADC_TRGR_TRGMOD_PERIOD;
                   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
@@ -645,14 +649,16 @@ static void sam_tsd_bottomhalf(void *arg)
                   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
                   regval &= ~ADC_TRGR_TRGMOD_MASK;
                   regval |= ADC_TRGR_TRGMOD_PEN;
-                  sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);              
+                  sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
                 }
             }
+#endif
+
           goto ignored;
         }
 
       /* Sample positional values.  Get raw X and Y position data */
-      
+
       regval = sam_adc_getreg(priv->adc, SAM_ADC_XPOSR);
       xraw   = (regval & ADC_XPOSR_XPOS_MASK) >> ADC_XPOSR_XPOS_SHIFT;
       xscale = (regval & ADC_XPOSR_XSCALE_MASK) >> ADC_XPOSR_XSCALE_SHIFT;
@@ -679,6 +685,7 @@ static void sam_tsd_bottomhalf(void *arg)
           goto ignored;
         }
 #endif
+
       /* Scale the X/Y measurements.  The scale value is the maximum
        * value that the sample can attain.  It should be close to 4095.
        * Scaling:
@@ -695,7 +702,6 @@ static void sam_tsd_bottomhalf(void *arg)
       y  = ((yraw << 12) - yraw) / yscale;
 #endif
 
-      //x = 4096 - x;
       /* Perform a thresholding operation so that the results will be
        * more stable.  If the difference from the last sample is small,
        * then ignore the event. REVISIT:  Should a large change in
@@ -745,13 +751,14 @@ static void sam_tsd_bottomhalf(void *arg)
        * necessary to determine the value of Rp (Zaxis resistance).
        *
        *   Rp = Rxp * (X / 1024) * [(Z2 / Z1) - 1]
-       * 
-       * Revisited - 
+       *
+       * Revisited. The ADC is 12 bit not 10 so datasheet is presumed
+       * incorrect. Formula corrected to cope with uint arithmetic.
        */
 
       z2 = (pressr & ADC_PRESSR_Z2_MASK) >> ADC_PRESSR_Z2_SHIFT;
       z1 = (pressr & ADC_PRESSR_Z1_MASK) >> ADC_PRESSR_Z1_SHIFT;
-      
+
       if (z1 != 0)
         {
           p = CONFIG_SAMA_TSD_RXP * xraw * (z2 - z1) / (z1 * 4096);
@@ -780,6 +787,7 @@ static void sam_tsd_bottomhalf(void *arg)
 
           priv->sample.contact = CONTACT_DOWN;
 
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
           /* Configure for periodic trigger */
 
           sam_tsd_setaverage(priv, ADC_TSMR_TSAV_8CONV);
@@ -789,6 +797,7 @@ static void sam_tsd_bottomhalf(void *arg)
           regval &= ~ADC_TRGR_TRGMOD_MASK;
           regval |= ADC_TRGR_TRGMOD_PERIOD;
           sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+#endif
         }
     }
 
@@ -1342,7 +1351,6 @@ static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time)
 
 #if defined (ATSAMA5D4)
 
-
   /* Formula for SHTIM is:
    *
    *  TRACKTIM     = (TrackingTime * ADCCLK) / (1000000000) - 1
@@ -1444,12 +1452,14 @@ static void sam_tsd_trigperiod(struct sam_tsd_s *priv, uint32_t period)
         }
     }
 
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
   /* Set the calculated trigger period in the TRGR register */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGPER_MASK;
   regval |=  ADC_TRGR_TRGPER(trigper);
   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+#endif
 }
 
 /****************************************************************************
@@ -1544,12 +1554,14 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 {
   uint32_t regval;
 
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
   /* Disable touch trigger */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGMOD_MASK;
   regval |= ADC_TRGR_TRGMOD_NOTRIG;
   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+#endif
 
   /* Setup timing */
 
@@ -1616,21 +1628,23 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 #endif
   sam_adc_putreg(priv->adc, SAM_ADC_ACR, regval);
 
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
   /* Configure pen interrupt generation */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGMOD_MASK;
   regval |= ADC_TRGR_TRGMOD_PEN;
   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+#endif
 
   sam_adc_putreg(priv->adc, SAM_ADC_IER, ADC_INT_PEN);
 
   /* perform a ts calibration */
+
   regval = ADC_CR_TSCALIB | ADC_CR_START;
   sam_adc_putreg(priv->adc, SAM_ADC_CR, regval);
 
   up_enable_irq(SAM_IRQ_ADC);
-  
 }
 
 /****************************************************************************
@@ -1664,13 +1678,14 @@ static void sam_tsd_uninitialize(struct sam_tsd_s *priv)
    */
 
   sam_adc_putreg(priv->adc, SAM_ADC_IDR, ADC_TSD_ALLINTS);
-
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
   /* Disable touch trigger */
 
   regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGMOD_MASK;
   regval |= ADC_TRGR_TRGMOD_NOTRIG;
   sam_adc_putreg(priv->adc, SAM_ADC_TRGR, regval);
+#endif
 
   /* Disable the touchscreen mode */
 
@@ -1721,7 +1736,7 @@ int sam_tsd_register(struct sam_adc_s *adc, int minor)
   /* Initialize the touchscreen device driver instance */
 
   memset(priv, 0, sizeof(struct sam_tsd_s));
-  priv->adc     = adc;          /* Save the ADC device handle */
+  priv->adc     = adc;               /* Save the ADC device handle    */
   priv->threshx = INVALID_THRESHOLD; /* Initialize thresholding logic */
   priv->threshy = INVALID_THRESHOLD; /* Initialize thresholding logic */
   nxsem_init(&priv->waitsem, 0, 0);
