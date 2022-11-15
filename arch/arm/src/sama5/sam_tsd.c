@@ -1412,8 +1412,11 @@ static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time)
 static void sam_tsd_trigperiod(struct sam_tsd_s *priv, uint32_t period)
 {
   uint32_t trigper;
-  uint32_t regval;
   uint32_t div;
+
+#ifdef SAMA5_TSD_PENDET_TRIG_ALLOWED
+  uint32_t regval;
+#endif
 
   /* Divide trigger period avoid overflows.  Division by ten is awkard, but
    * appropriate here because times are specified in decimal with lots of
