@@ -108,3 +108,4 @@ drivers/power/act8945a.c_deprecated
 .config_10.3-porting
 libs/libnx/.context
 check_op.txt
+check_op.tx

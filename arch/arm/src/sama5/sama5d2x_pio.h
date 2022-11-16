@@ -109,12 +109,12 @@
 
 #define PIO_INT_SHIFT             (10)        /* Bits 9-12: PIO interrupt bits */
 #define PIO_INT_MASK              (7 << PIO_INT_SHIFT)
-#define PIO_INT_NONE            (0 << PIO_INT_SHIFT)
-#define PIO_INT_FALLING         (1 << PIO_INT_SHIFT)
-#define PIO_INT_RISING          (2 << PIO_INT_SHIFT)
-#define PIO_INT_BOTHEDGES       (3 << PIO_INT_SHIFT)
-#define PIO_INT_LOWLEVEL        (4 << PIO_INT_SHIFT)
-#define PIO_INT_HIGHLEVEL       (5 << PIO_INT_SHIFT)
+#define PIO_INT_NONE              (0 << PIO_INT_SHIFT)
+#define PIO_INT_FALLING           (1 << PIO_INT_SHIFT)
+#define PIO_INT_RISING            (2 << PIO_INT_SHIFT)
+#define PIO_INT_BOTHEDGES         (3 << PIO_INT_SHIFT)
+#define PIO_INT_LOWLEVEL          (4 << PIO_INT_SHIFT)
+#define PIO_INT_HIGHLEVEL         (5 << PIO_INT_SHIFT)
 
 /* If the pin is an interrupt, then this determines if the pin is a secure:
  *
