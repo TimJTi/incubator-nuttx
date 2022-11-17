@@ -109,3 +109,7 @@ drivers/power/act8945a.c_deprecated
 libs/libnx/.context
 check_op.txt
 check_op.tx
+arch/arm/src/sama5/hardware/sam_adc.h.bu
+._.config
+arch/arm/src/sama5/sam_adc.c.bu
+arch/arm/src/sama5/sam_adc.h.bu
