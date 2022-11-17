@@ -261,9 +261,10 @@ static uint32_t sam_configcommon(pio_pinset_t cfgset)
       regval |= PIO_CFGR_DRVSTR_HIGH;
       break;
     }
-  
+
   /* Select Input Event selection.
-   * NOTE: Only applies to input pins */
+   * NOTE: Only applies to input pins
+   */
 
   switch (cfgset & PIO_INT_MASK)
     {
