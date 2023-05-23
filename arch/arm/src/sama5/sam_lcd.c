@@ -126,7 +126,7 @@
 #  define SAMA5_LCDC_BASE_COLOR_FMT ??? /* No color format definition */
 #elif defined(CONFIG_SAMA5_LCDC_BASE_ARGB8888)
 #  define SAMA5_LCDC_BASE_BPP       32
-#  define SAMA5_LCDC_BASE_COLOR_FMT ??? /* No color format definition */
+#  define SAMA5_LCDC_BASE_COLOR_FMT FB_FMT_RGBA32 /* No color format definition */
 #elif defined(CONFIG_SAMA5_LCDC_BASE_RGBA8888)
 #  define SAMA5_LCDC_BASE_BPP       32
 #  define SAMA5_LCDC_BASE_COLOR_FMT FB_FMT_RGBA32
@@ -2064,6 +2064,8 @@ static void sam_layer_color(void)
 
   /* Base channel color configuration */
 
+
+
 #if defined(CONFIG_SAMA5_LCDC_BASE_RGB888P)
   LAYER_BASE.bpp = 24;
 
@@ -2079,6 +2081,22 @@ static void sam_layer_color(void)
              LCDC_BASECFG0_DLBO | LCDC_BASECFG0_BLEN_INCR16);
   sam_putreg(SAM_LCDC_BASECFG1,
              LCDC_BASECFG1_16BPP_RGB565);
+
+#elif defined(CONFIG_SAMA5_LCDC_BASE_RGBA8888)
+  LAYER_BASE.bpp = 32;
+
+  sam_putreg(SAM_LCDC_BASECFG0,
+             LCDC_BASECFG0_DLBO | LCDC_BASECFG0_BLEN_INCR16);
+  sam_putreg(SAM_LCDC_BASECFG1,
+             LCDC_BASECFG1_32BPP_RGBA8888);
+
+#elif defined(CONFIG_SAMA5_LCDC_BASE_ARGB8888)
+  LAYER_BASE.bpp = 32;
+
+  sam_putreg(SAM_LCDC_BASECFG0,
+             LCDC_BASECFG0_DLBO | LCDC_BASECFG0_BLEN_INCR16);
+  sam_putreg(SAM_LCDC_BASECFG1,
+             LCDC_BASECFG1_32BPP_ARGB8888);
 
 #else
 #  error Support for this resolution is not yet implemented
