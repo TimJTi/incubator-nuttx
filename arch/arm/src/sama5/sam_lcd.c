@@ -3134,7 +3134,7 @@ void sam_lcdclear(nxgl_mxpixel_t color)
   uint32_t *dest = (uint32_t *)LAYER_BASE.framebuffer;
   int i;
 
-  lcdinfo("Clearing display: BPP=32 color=%08x framebuffer=%08x size=%d\n",
+  lcdinfo("Clearing display: BPP=32 color=%" PRIx32 "framebuffer=%hhn size=%d\n",
           color, LAYER_BASE.framebuffer, SAMA5_BASE_FBSIZE);
 
   for (i = 0; i < SAMA5_BASE_FBSIZE; i += sizeof(uint32_t))
