@@ -40,14 +40,27 @@
 #  define CONFIG_SAMA5_TSD_RXP 6
 #endif
 
+#if !defined(CONFIG_SAMA5_ADC_SWTRIG) && \
+    !defined(CONFIG_SAMA5_ADC_PERIODIC_TRIG) && \
+    !defined(CONFIG_SAMA5_ADC_CONTINUOUS_TRIG)
+#  warning ADC trigger mode incompatible with TSD operation
+#endif
+
 #ifndef CONFIG_SAMA5_ADC_TRIGGER_PERIOD
 #  define CONFIG_SAMA5_ADC_TRIGGER_PERIOD 20000
 #endif
 
-/* Only allow Pendet triggering in limited circumstances */
+/* Only allow TSD trigger mode changes in limited circumstances.
+ * The TSD driver changes between pen detection and periodic triggers
+ * but this can upset normal non-tsd ADC operation, so we only allow the
+ * driver to change the mode if SW trigger mode is set.
+ * NB - this still might conflict of course so BEWARE!
+ */
 
-#if defined(CONFIG_SAMA5_ADC_SWTRIG)
-#  define SAMA5_TSD_PENDET_TRIG_ALLOWED
+#ifdef CONFIG_SAMA5_ADC_SWTRIG
+#  define SAMA5_TSD_TRIG_CHANGE_ALLOWED
+#else
+#  warning TSD will not be using Pen Detection interrupts
 #endif
 
 /* Touchscreen interrupt event sets
