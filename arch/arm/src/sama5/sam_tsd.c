@@ -526,14 +526,16 @@ static void sam_tsd_bottomhalf(void *arg)
   uint32_t yscale;
   uint32_t y;
   uint32_t ydiff;
+#ifdef CONFIG_SAMA5_TSD_4WIRE  
   uint32_t z1;
   uint32_t z2;
   uint32_t pressr;
   uint32_t p;
+#endif
   bool pendown;
 
   DEBUGASSERT(priv != NULL);
-  regval  = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
+  regval = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
 
   /* Get exclusive access to the driver data structure */
 
@@ -571,7 +573,7 @@ static void sam_tsd_bottomhalf(void *arg)
 #ifdef SAMA5_TSD_TRIG_CHANGE_ALLOWED
       ier = ADC_INT_PEN;
 #else
-      ier = ADC_TSD_ALLINTS;
+      ier = ADC_TSD_PRESSINTS;
 #endif      
 
       /* Ignore the interrupt if the pen was already up (CONTACT_NONE == pen
@@ -826,8 +828,6 @@ ignored:
   /* Re-enable touchscreen interrupts as appropriate. */
 
   sam_adc_putreg(priv->adc, SAM_ADC_IER, ier);
-  regval  = sam_adc_getreg(priv->adc, SAM_ADC_IMR);
-  iinfo("mask reg = %lx\n", regval);
 
   /* Release our lock on the state structure */
 
