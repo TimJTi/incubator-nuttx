@@ -62,6 +62,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <debug.h>
+#include <math.h>
 
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
@@ -158,6 +159,12 @@
 #  define BOARD_TOUCHSCREEN_SAMPLE_CACHES 64
 #endif
 
+#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIG
+#  if (CONFIG_SAMA5_TSD_TRIGGER_PERIOD < CONFIG_SAMA5_ADC_TRIGGER_PERIOD)
+#    error Invalid TSD trigger rate
+#  endif
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -249,7 +256,7 @@ static int  sam_tsd_poll(struct file *filep, struct pollfd *fds, bool setup);
 
 static void sam_tsd_startuptime(struct sam_tsd_s *priv, uint32_t time);
 static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time);
-static void sam_tsd_trigperiod(struct sam_tsd_s *priv, uint32_t period);
+static void sam_adc_trigperiod(struct sam_tsd_s *priv, uint32_t period);
 static void sam_tsd_debounce(struct sam_tsd_s *priv, uint32_t time);
 static void sam_tsd_initialize(struct sam_tsd_s *priv);
 static void sam_tsd_uninitialize(struct sam_tsd_s *priv);
@@ -441,6 +448,10 @@ errout:
  * Input Parameters:
  *   priv - The touchscreen private data structure
  *   tsav - The new (shifted) value of the TSAV field of ADC TSMR register
+ *     0: No filtering
+ *     1: Averages 2 ADC conversions
+ *     2: Averages 4 ADC conversions
+ *     3: Averages 8 ADC conversions
  *
  * Returned Value:
  *   None
@@ -451,40 +462,34 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
 {
   uint32_t regval;
   uint32_t minfreq;
-  uint32_t tsfreq;
+  uint32_t tsfreq = 0;
+  uint32_t tsdper = CONFIG_SAMA5_TSD_TRIGGER_PERIOD;
+  uint32_t adcper = CONFIG_SAMA5_ADC_TRIGGER_PERIOD;
+  const uint32_t tsfreqmax = 0xff;
+
+#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIGGER
+  while (tsdper > (pow(2, tsfreq) * adcper))
+    {
+      tsfreq++;
+      if (tsfreq >= tsfreqmax)
+        {
+          break;
+        }
+    }
+#endif
+  /* Get the unshifted TSAV value and compare it to the touchscreen
+   * frequency
+   * TSFREQ: Defines the Touchscreen Frequency compared to the Trigger
+   * Frequency. TSFREQ must be greater or equal to TSAV. <--
+   */
+
+  minfreq = MAX(tsav >> ADC_TSMR_TSAV_SHIFT, tsfreq);
 
   /* Get the current value of the TSMR register */
 
   regval = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
-
-  /* Get the unshifted TSAVE value and compare it to the touchscreen
-   * frequency
-   *
-   *   minfreq = 0: No filtering
-   *   minfreq = 1: Averages 2 ADC conversions
-   *   minfreq = 2: Averages 4 ADC conversions
-   *   minfreq = 3: Averages 8 ADC conversions
-   */
-
-  minfreq = (tsav >> ADC_TSMR_TSAV_SHIFT);
-
-  if (minfreq)
-    {
-      /* TSFREQ: Defines the Touchscreen Frequency compared to the Trigger
-       * Frequency.  --> TSFREQ must be greater or equal to TSAV. <--
-       */
-
-      tsfreq = (regval & ADC_TSMR_TSFREQ_MASK) >> ADC_TSMR_TSFREQ_SHIFT;
-      if (minfreq > tsfreq)
-        {
-          /* Set TSFREQ = TSAV */
-
-          tsfreq = minfreq;
-        }
-
-        regval &= ~ADC_TSMR_TSFREQ_MASK;
-        regval |=  ADC_TSMR_TSFREQ(minfreq);
-    }
+  regval &= ~ADC_TSMR_TSFREQ_MASK;
+  regval |=  ADC_TSMR_TSFREQ(minfreq);
 
   /* Save the new filter value */
 
@@ -734,7 +739,7 @@ static void sam_tsd_bottomhalf(void *arg)
        * the last measurement.
        */
 
-      if (priv->sample.contact == CONTACT_MOVE &&
+      if (priv->sample.contact != CONTACT_UP &&
           xdiff < CONFIG_SAMA5_TSD_THRESHX &&
           ydiff < CONFIG_SAMA5_TSD_THRESHY)
         {
@@ -1450,11 +1455,11 @@ static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time)
 }
 
 /****************************************************************************
- * Name: sam_tsd_trigperiod
+ * Name: sam_adc_trigperiod
  *
  * Description:
- *   Set the TGPER field of the TRGR register in order to define a periodic
- *   trigger perioc.
+ *   Set the TGPER field of the ADC TRGR register in order to define a
+ * periodic trigger period.
  *
  *     Trigger Period = (TRGPER+1) / ADCCLK
  *
@@ -1467,13 +1472,13 @@ static void sam_tsd_tracking(struct sam_tsd_s *priv, uint32_t time)
  *
  ****************************************************************************/
 
-static void sam_tsd_trigperiod(struct sam_tsd_s *priv, uint32_t period)
+static void sam_adc_trigperiod(struct sam_tsd_s *priv, uint32_t period)
 {
   uint32_t trigper;
   uint32_t regval;
   uint32_t div;
 
-  /* Divide trigger period avoid overflows.  Division by ten is awkard, but
+  /* Divide trigger period avoid overflows.  Division by ten is awkward, but
    * appropriate here because times are specified in decimal with lots of
    * zeroes.
    */
@@ -1549,7 +1554,7 @@ static void sam_tsd_debounce(struct sam_tsd_s *priv, uint32_t time)
 
   DEBUGASSERT(time > 0);
 
-  /* Divide time and ADCCLK to avoid overflows.  Division by ten is awkard,
+  /* Divide time and ADCCLK to avoid overflows.  Division by ten is awkward,
    * but appropriate here because times are specified in decimal with lots of
    * zeroes.
    */
@@ -1629,18 +1634,18 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
    * continuous mode is set of course.
    */
 
-#ifdef CONFIG_SAMA5_ADC_TRIGGER_PERIOD
+#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIG
   regval  = sam_adc_getreg(priv, SAM_ADC_TRGR);
   regval &= ~ADC_TRGR_TRGMOD_MASK;
   regval |= ADC_TRGR_TRGMOD_PERIOD;
   sam_adc_putreg(priv, SAM_ADC_TRGR, regval);
-  sam_tsd_trigperiod(priv, CONFIG_SAMA5_ADC_TRIGGER_PERIOD);
+  sam_adc_trigperiod(priv, CONFIG_SAMA5_ADC_TRIGGER_PERIOD);
 
   /* Make sure the configured trigger period is used */
 
-  sam_tsd_trigperiod(priv, CONFIG_SAMA5_ADC_TRIGGER_PERIOD);
+  sam_adc_trigperiod(priv, CONFIG_SAMA5_ADC_TRIGGER_PERIOD);
 #else
-  sam_tsd_trigperiod(priv, 20000); /*  20ms */
+  sam_adc_trigperiod(priv, CONFIG_SAMA5_TSD_TRIGGER_PERIOD); /*  20ms */
 #endif
 
   /* Setup the touchscreen mode */
@@ -1690,6 +1695,7 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
   /* Set up pen debounce time */
 
   sam_tsd_debounce(priv, BOARD_TSD_DEBOUNCE);
+  sam_tsd_setaverage(priv, BOARD_TSD_PENDOWN_TSAV);
 
   /* Configure pen sensitivity */
 

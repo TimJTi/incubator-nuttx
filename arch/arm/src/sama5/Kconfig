@@ -4945,6 +4945,13 @@ config SAMA5_TSD_5WIRE
 
 endchoice # Touchscreen interface
 
+config SAMA5_TSD_TRIGGER_PERIOD
+	int "Touchscreen trigger period"
+	default 20000
+	---help---
+		This setting determines the periodic sample trigger rate in useconds.
+		It must be equal to or less than the configured ADC trigger rate
+
 config SAMA5_TSD_SWAPXY
 	bool "Swap X/Y"
 	default n

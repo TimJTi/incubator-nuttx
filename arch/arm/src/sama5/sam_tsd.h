@@ -51,7 +51,7 @@
 #endif
 
 /* Only allow TSD trigger mode changes in limited circumstances.
- * The TSD driver changes between pen detection and periodic triggers
+ * The TSD driver can change between pen detection and periodic triggers
  * but this can upset normal non-tsd ADC operation, so we only allow the
  * driver to change the mode if SW trigger mode is set.
  * NB - this still might conflict of course so BEWARE!
@@ -60,7 +60,7 @@
 #ifdef CONFIG_SAMA5_ADC_SWTRIG
 #  define SAMA5_TSD_TRIG_CHANGE_ALLOWED
 #else
-#  warning TSD will not be using Pen Detection interrupts
+#  warning TSD will not dynamically change interrupt triggers (PENDET<->PERIODIC)
 #endif
 
 /* Touchscreen interrupt event sets
