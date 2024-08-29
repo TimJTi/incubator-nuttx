@@ -467,8 +467,12 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
   uint32_t adcper = CONFIG_SAMA5_ADC_TRIGGER_PERIOD;
   const uint32_t tsfreqmax = 0xff;
 
-#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIGGER
-  while (tsdper > (pow(2, tsfreq) * adcper))
+#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIG
+  /* tsfreq = (adc trigger freq) / 2^tsfreq, or
+   * tsdper = (adc period) * 2^tsfreq
+   */
+
+  while (tsdper > (adcper * pow(2, tsfreq)))
     {
       tsfreq++;
       if (tsfreq >= tsfreqmax)
@@ -476,6 +480,7 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
           break;
         }
     }
+
 #endif
   /* Get the unshifted TSAV value and compare it to the touchscreen
    * frequency
