@@ -463,13 +463,19 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
   uint32_t regval;
   uint32_t minfreq;
   uint32_t tsfreq = 0;
-  uint32_t power;
+#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIG
+
+  /* WIth periodic trigger, the TSD sample rate might be too high so we set
+   * it independently here.
+   */
+
+  uint32_t       power;
   const uint32_t tsdper = CONFIG_SAMA5_TSD_TRIGGER_PERIOD;
   const uint32_t adcper = CONFIG_SAMA5_ADC_TRIGGER_PERIOD;
   const uint32_t tsfreqmax = 0xff;
 
-#ifdef CONFIG_SAMA5_ADC_PERIODIC_TRIG
-  /* tsfreq = (adc trigger freq) / 2^tsfreq, or
+  /* From the datasheet:
+   * tsfreq = (adc trigger freq) / 2^tsfreq, or
    * tsdper = (adc period) * 2^tsfreq
    */
 
@@ -484,7 +490,7 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
   /* Get the unshifted TSAV value and compare it to the touchscreen
    * frequency
    * TSFREQ: Defines the Touchscreen Frequency compared to the Trigger
-   * Frequency. TSFREQ must be greater or equal to TSAV. <--
+   * Frequency. TSFREQ must be greater or equal to TSAV.
    */
 
   minfreq = MAX(tsav >> ADC_TSMR_TSAV_SHIFT, tsfreq);
@@ -519,7 +525,6 @@ static void sam_tsd_setaverage(struct sam_tsd_s *priv, uint32_t tsav)
  *   None
  *
  ****************************************************************************/
-
 static void sam_tsd_bottomhalf(void *arg)
 {
   struct sam_tsd_s *priv = (struct sam_tsd_s *)arg;
@@ -543,7 +548,6 @@ static void sam_tsd_bottomhalf(void *arg)
   bool pendown;
 
   DEBUGASSERT(priv != NULL);
-  regval = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
 
   /* Get exclusive access to the driver data structure */
 
@@ -556,15 +560,16 @@ static void sam_tsd_bottomhalf(void *arg)
    *   - Pen up interrrupt occurred as we need to deal with that
    */
 
-  pendown = ((((pending & ADC_SR_PENS) != 0) ||
-              ((pending & ADC_INT_PEN) != 0)) &&
-             (pending & ADC_INT_NOPEN) == 0);
+  pendown = (((pending & ADC_SR_PENS) != 0) ||
+             ((pending & ADC_INT_PEN) != 0)) &&
+             ((pending & ADC_INT_NOPEN) == 0);
 
   /* Handle the change from pen down to pen up */
 
   iinfo("pending: %08" PRIx32 " pendown: %d contact: %d\n",
         pending, pendown, priv->sample.contact);
 
+  ier = 0;
   if (!pendown)
     {
       /* The pen is up.. reset thresholding variables. */
@@ -657,11 +662,19 @@ static void sam_tsd_bottomhalf(void *arg)
 
           /* datasheet says that if TSAV != 0 there may not be interrupts
            * for TSD channels so periodic or continuous triggers are needed.
-           * We may be already using periodic triggers (for std adc ops).
+           * Note: We may be already using periodic triggers (for std adc
+           * ops).
+           * Real world testing shows that if we don't enforce Periodic
+           * triggers - regardless of TSAV value - we still miss samples.
+           * 
+           * This probably warrants a future revisit.
            */
+
 #ifdef SAMA5_TSD_TRIG_CHANGE_ALLOWED
+#  if 0
           regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
           if ((regval & ADC_TSMR_TSAV_MASK) != 0)
+#  endif
             {
               regval = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
 
@@ -1649,7 +1662,7 @@ static void sam_tsd_initialize(struct sam_tsd_s *priv)
 
   sam_adc_trigperiod(priv, CONFIG_SAMA5_ADC_TRIGGER_PERIOD);
 #else
-  sam_adc_trigperiod(priv, CONFIG_SAMA5_TSD_TRIGGER_PERIOD); /*  20ms */
+  sam_adc_trigperiod(priv, 20000); /*  20ms */
 #endif
 
   /* Setup the touchscreen mode */
