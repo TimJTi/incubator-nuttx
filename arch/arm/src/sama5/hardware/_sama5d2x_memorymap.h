@@ -45,7 +45,9 @@
  * negative values unless we force them to unsigned long:
  */
 
-#define __CONCAT(a,b) a ## b
+//#ifndef __CONCAT
+#  define __CONCAT(a,b) a ## b
+//#endif
 #define MKULONG(a) __CONCAT(a,ul)
 
 /* Overview:
