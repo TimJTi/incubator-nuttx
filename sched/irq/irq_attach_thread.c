@@ -1,6 +1,8 @@
 /****************************************************************************
  * sched/irq/irq_attach_thread.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -170,7 +172,7 @@ int irq_attach_thread(int irq, xcpt_t isr, xcpt_t isrthread, FAR void *arg,
 
   if (isrthread == NULL)
     {
-      irq_attach(irq, NULL, arg);
+      irq_detach(irq);
       DEBUGASSERT(g_irq_thread_pid[ndx] != 0);
       kthread_delete(g_irq_thread_pid[ndx]);
       g_irq_thread_pid[ndx] = 0;

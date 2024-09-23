@@ -1,6 +1,8 @@
 # ##############################################################################
 # cmake/nuttx_add_application.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -155,7 +157,7 @@ function(nuttx_add_application)
 
     # loadable build requires applying ELF flags to all applications
 
-    if(CONFIG_BUILD_LOADABLE)
+    if(CONFIG_MODULES)
       target_compile_options(
         ${TARGET}
         PRIVATE

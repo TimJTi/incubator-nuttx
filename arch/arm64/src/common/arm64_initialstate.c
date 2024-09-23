@@ -104,10 +104,12 @@ void arm64_new_task(struct tcb_s * tcb)
   pinitctx->sp_el0    = (uint64_t)pinitctx;
 #endif
   pinitctx->exe_depth = 0;
-  pinitctx->tpidr_el0 = (uint64_t)tcb;
-  pinitctx->tpidr_el1 = (uint64_t)tcb;
 
   tcb->xcp.regs       = (uint64_t *)pinitctx;
+
+#ifndef CONFIG_BUILD_FLAT
+  tcb->xcp.initregs   = tcb->xcp.regs;
+#endif
 }
 
 /****************************************************************************
@@ -158,8 +160,6 @@ void up_initial_state(struct tcb_s *tcb)
        */
 
       write_sysreg(0, tpidrro_el0);
-      write_sysreg(tcb, tpidr_el1);
-      write_sysreg(tcb, tpidr_el0);
 
 #ifdef CONFIG_STACK_COLORATION
 

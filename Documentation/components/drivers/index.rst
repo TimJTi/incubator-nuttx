@@ -11,6 +11,7 @@ divided in three classes:
   character/index.rst
   block/index.rst
   special/index.rst
+  thermal/index.rst
 
 .. note::
   Device driver support depends on the *in-memory*, *pseudo*
@@ -177,6 +178,10 @@ Subdirectories of ``nuttx/drivers``
 * ``notes/`` :doc:`character/note`
 
   Note Driver Support.
+
+* ``pinctrl/`` :doc:`special/pinctrl`
+
+  Configure and manage pin.
 
 * ``pipes/`` :doc:`special/pipes`
 

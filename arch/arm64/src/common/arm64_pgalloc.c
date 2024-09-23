@@ -35,6 +35,7 @@
 #include <nuttx/pgalloc.h>
 #include <nuttx/sched.h>
 
+#include "sched/sched.h"
 #include "addrenv.h"
 #include "barriers.h"
 #include "pgalloc.h"
@@ -89,9 +90,10 @@
 
 uintptr_t pgalloc(uintptr_t brkaddr, unsigned int npages)
 {
-  struct tcb_s          *tcb = nxsched_self();
+  struct tcb_s          *tcb = this_task();
   struct arch_addrenv_s *addrenv;
   uintptr_t              ptlast;
+  uintptr_t              ptlevel;
   uintptr_t              paddr;
   uintptr_t              vaddr;
 
@@ -113,7 +115,8 @@ uintptr_t pgalloc(uintptr_t brkaddr, unsigned int npages)
 
   /* Start mapping from the old heap break address */
 
-  vaddr = brkaddr;
+  vaddr   = brkaddr;
+  ptlevel = MMU_PGT_LEVEL_MAX;
 
   /* Sanity checks */
 
@@ -144,7 +147,7 @@ uintptr_t pgalloc(uintptr_t brkaddr, unsigned int npages)
 
       /* Then add the reference */
 
-      mmu_ln_setentry(MMU_PGT_LEVELS, ptlast, paddr, vaddr, MMU_UDATA_FLAGS);
+      mmu_ln_setentry(ptlevel, ptlast, paddr, vaddr, MMU_UDATA_FLAGS);
       vaddr += MM_PGSIZE;
     }
 

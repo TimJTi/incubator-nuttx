@@ -1,6 +1,8 @@
 /****************************************************************************
  * net/tcp/tcp.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -282,6 +284,9 @@ struct tcp_conn_s
   uint16_t flags;         /* Flags of TCP-specific options */
 #ifdef CONFIG_NET_SOLINGER
   sclock_t ltimeout;      /* Linger timeout expiration */
+#endif
+#ifdef CONFIG_NETDEV_RSS
+  int      rcvcpu;        /* Currect cpu id */
 #endif
   /* If the TCP socket is bound to a local address, then this is
    * a reference to the device that routes traffic on the corresponding

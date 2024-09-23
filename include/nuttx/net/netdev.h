@@ -120,6 +120,11 @@
        } \
      while (0)
 
+#define _NETDEV_BYTES(dev,name) \
+    do { \
+        (dev)->d_statistics.name += (dev)->d_len; \
+    } while (0)
+
 #  if CONFIG_NETDEV_STATISTICS_LOG_PERIOD > 0
 #    define NETDEV_STATISTICS_WORK LPWORK
 #    define _NETDEV_STATISTIC_LOG(dev,name) \
@@ -139,7 +144,12 @@
 #    define _NETDEV_STATISTIC_LOG(dev,name) _NETDEV_STATISTIC(dev,name)
 #  endif
 
-#  define NETDEV_RXPACKETS(dev)   _NETDEV_STATISTIC_LOG(dev,rx_packets)
+#  define NETDEV_RXPACKETS(dev) \
+    do { \
+        _NETDEV_STATISTIC_LOG(dev,rx_packets); \
+        _NETDEV_BYTES(dev,rx_bytes); \
+    } while (0)
+
 #  define NETDEV_RXFRAGMENTS(dev) _NETDEV_STATISTIC(dev,rx_fragments)
 #  define NETDEV_RXERRORS(dev)    _NETDEV_ERROR(dev,rx_errors)
 #  ifdef CONFIG_NET_IPv4
@@ -159,11 +169,15 @@
 #  endif
 #  define NETDEV_RXDROPPED(dev)   _NETDEV_STATISTIC(dev,rx_dropped)
 
-#  define NETDEV_TXPACKETS(dev)   _NETDEV_STATISTIC_LOG(dev,tx_packets)
+#  define NETDEV_TXPACKETS(dev) \
+    do { \
+        _NETDEV_STATISTIC_LOG(dev,tx_packets); \
+        _NETDEV_BYTES(dev,tx_bytes); \
+    } while (0)
+
 #  define NETDEV_TXDONE(dev)      _NETDEV_STATISTIC(dev,tx_done)
 #  define NETDEV_TXERRORS(dev)    _NETDEV_ERROR(dev,tx_errors)
 #  define NETDEV_TXTIMEOUTS(dev)  _NETDEV_ERROR(dev,tx_timeouts)
-
 #  define NETDEV_ERRORS(dev)      _NETDEV_STATISTIC(dev,errors)
 
 #else
@@ -235,6 +249,7 @@ struct netdev_statistics_s
   uint32_t rx_arp;         /* Number of Rx ARP packets received */
 #endif
   uint32_t rx_dropped;     /* Unsupported Rx packets received */
+  uint64_t rx_bytes;       /* Number of bytes received */
 
   /* Tx Status */
 
@@ -242,6 +257,7 @@ struct netdev_statistics_s
   uint32_t tx_done;        /* Number of packets completed */
   uint32_t tx_errors;      /* Number of receive errors (incl timeouts) */
   uint32_t tx_timeouts;    /* Number of Tx timeout errors */
+  uint64_t tx_bytes;       /* Number of bytes send */
 
   /* Other status */
 
@@ -279,6 +295,14 @@ struct netdev_ifaddr6_s
   net_ipv6addr_t addr; /* Host IPv6 address */
   net_ipv6addr_t mask; /* Network IPv6 subnet mask */
 };
+
+#ifdef CONFIG_NETDEV_RSS
+struct netdev_rss_s
+{
+  int      cpu;  /* CPU ID */
+  uint32_t hash; /* Hash value with packet */
+};
+#endif // CONFIG_NETDEV_RSS
 
 /* This structure collects information that is specific to a specific network
  * interface driver.  If the hardware platform supports only a single

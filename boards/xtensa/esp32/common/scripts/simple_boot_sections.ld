@@ -147,9 +147,7 @@ SECTIONS
 
     *libc.a:lib_assert.*(.literal .text .literal.* .text.*)
     *libc.a:lib_utsname.*(.literal .text .literal.* .text.*)
-#ifdef CONFIG_ESP32_BLE
     *libc.a:sq_remlast.*(.literal .text .literal.* .text.*)
-#endif
 
     *libdrivers.a:syslog_flush.*(.literal .text .literal.* .text.*)
 
@@ -537,7 +535,9 @@ SECTIONS
   .rtc.data :
   {
     *(.rtc.data)
+    *(.rtc.data.*)
     *(.rtc.rodata)
+    *(.rtc.rodata.*)
 
    /* Whatever is left from the RTC memory is used as a special heap. */
 

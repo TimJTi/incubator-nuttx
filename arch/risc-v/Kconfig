@@ -403,6 +403,14 @@ config ARCH_RV_VECTOR_BYTE_LENGTH
 
 endif
 
+config ARCH_RV_MACHINE_ISA_1_13
+	bool "Machine ISA Version 1.13 or later"
+	default n
+	---help---
+		Indicates support for Machine ISA Version 1.13 or later.
+		This version defined hardware error and software check exception codes,
+		which extend the range of exception codes from 0 ~ 15 to 0 ~ 19.
+
 config ARCH_RV_ISA_ZICSR_ZIFENCEI
 	bool
 	default y
@@ -495,7 +503,6 @@ config ARCH_CHIP
 config ARCH_RISCV_INTXCPT_EXTENSIONS
 	bool "RISC-V Integer Context Extensions"
 	default n
-	depends on RV32M1_OPENISA_TOOLCHAIN
 	---help---
 		RISC-V could be customized with extensions. Some Integer Context
 		Registers have to be saved and restored when Contexts switch.
@@ -669,6 +676,7 @@ config LITEX_CORE_VEXRISCV_SMP
 	select ARCH_NEED_ADDRENV_MAPPING
 	select ARCH_HAVE_S_MODE
 	select ARCH_HAVE_ELF_EXECUTABLE
+	select ARCH_HAVE_PERF_EVENTS
 
 endchoice # LITEX Core Selection
 

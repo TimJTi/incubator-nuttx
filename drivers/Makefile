@@ -52,6 +52,7 @@ include eeprom/Make.defs
 include efuse/Make.defs
 include net/Make.defs
 include note/Make.defs
+include pinctrl/Make.defs
 include pipes/Make.defs
 include power/Make.defs
 include regmap/Make.defs
@@ -62,6 +63,7 @@ include sensors/Make.defs
 include serial/Make.defs
 include spi/Make.defs
 include syslog/Make.defs
+include thermal/Make.defs
 include timers/Make.defs
 include usbdev/Make.defs
 include usbhost/Make.defs
@@ -78,7 +80,7 @@ include segger/Make.defs
 include usrsock/Make.defs
 include reset/Make.defs
 include pci/Make.defs
-include virt/Make.defs
+include coresight/Make.defs
 
 ifeq ($(CONFIG_SPECIFIC_DRIVERS),y)
 -include platform/Make.defs

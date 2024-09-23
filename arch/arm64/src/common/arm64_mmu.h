@@ -149,6 +149,12 @@
 #define TCR_TG0_16K                 (2ULL << 14)
 #define TCR_EPD1_DISABLE            (1ULL << 23)
 
+#define TCR_AS_SHIFT                36U
+#define TCR_ASID_8                  (0ULL << TCR_AS_SHIFT)
+#define TCR_ASID_16                 (1ULL << TCR_AS_SHIFT)
+#define TCR_TBI0                    (1ULL << 37)
+#define TCR_TBI1                    (1ULL << 38)
+
 #define TCR_PS_BITS_4GB             0x0ULL
 #define TCR_PS_BITS_64GB            0x1ULL
 #define TCR_PS_BITS_1TB             0x2ULL
@@ -186,6 +192,26 @@
 #define TTBR_ASID_WIDTH             (16)
 #define TTBR_ASID_MASK              (((1UL << TTBR_ASID_WIDTH) - 1) << TTBR_ASID_SHIFT)
 
+/* TLBI instruction */
+
+#define TLBI_VADDR_SHIFT            (0)
+#define TLBI_VADDR_INPUT_SHIFT      (12) /* From input vaddr to TLBI vaddr field */
+#define TLBI_VADDR_WIDTH            (43)
+#define TLBI_VADDR_MASK             (((1UL << TLBI_VADDR_WIDTH) - 1) << TLBI_VADDR_SHIFT)
+#define TLBI_ASID_SHIFT             (48)
+#define TLBI_ASID_WIDTH             (16)
+#define TLBI_ASID_MASK              (((1UL << TLBI_ASID_WIDTH) - 1) << TLBI_ASID_SHIFT)
+
+/* Create an argument suitable for TLBI, with vaddr and asid as inputs */
+
+#define TLBI_ARG(vaddr, asid)                                       \
+  ({                                                                \
+    uintptr_t __arg;                                                \
+    __arg  = ((vaddr) >> TLBI_VADDR_INPUT_SHIFT) & TLBI_VADDR_MASK; \
+    __arg |= (uintptr_t)(asid) << TLBI_ASID_SHIFT;                  \
+    __arg;                                                          \
+  })
+
 /* Convenience macros to represent the ARMv8-A-specific
  * configuration for memory access permission and
  * cache-ability attribution.
@@ -213,26 +239,28 @@
 
 /* Amount of page table levels */
 
-#define MMU_PGT_LEVELS              (3U)
+#define MMU_PGT_LEVELS              (4U)
+#define MMU_PGT_LEVEL_MAX           (3U) /* Levels go from 0-3 */
 
 /* Page sizes per page table level */
 
-#define MMU_L1_PAGE_SIZE            (0x40000000) /* 1G */
-#define MMU_L2_PAGE_SIZE            (0x200000)   /* 2M */
-#define MMU_L3_PAGE_SIZE            (0x1000)     /* 4K */
+#define MMU_L0_PAGE_SIZE            (0x8000000000) /* 512G */
+#define MMU_L1_PAGE_SIZE            (0x40000000)   /* 1G */
+#define MMU_L2_PAGE_SIZE            (0x200000)     /* 2M */
+#define MMU_L3_PAGE_SIZE            (0x1000)       /* 4K */
 
 /* Flags for user page tables */
 
-#define MMU_UPGT_FLAGS              (0)
+#define MMU_UPGT_FLAGS              (PTE_TABLE_DESC)
 
 /* Flags for normal memory region */
 
-#define MMU_MT_NORMAL_FLAGS         (PTE_BLOCK_DESC_INNER_SHARE | PTE_BLOCK_DESC_MEMTYPE(MT_NORMAL))
+#define MMU_MT_NORMAL_FLAGS         (PTE_PAGE_DESC | PTE_BLOCK_DESC_AF | PTE_BLOCK_DESC_INNER_SHARE | PTE_BLOCK_DESC_MEMTYPE(MT_NORMAL))
 
 /* Flags for user FLASH (RX) and user RAM (RW) */
 
 #define MMU_UTEXT_FLAGS             (PTE_BLOCK_DESC_AP_RO | PTE_BLOCK_DESC_PXN | PTE_BLOCK_DESC_AP_USER | PTE_BLOCK_DESC_NG | MMU_MT_NORMAL_FLAGS)
-#define MMU_UDATA_FLAGS             (PTE_BLOCK_DESC_AP_RW | PTE_BLOCK_DESC_PXN | PTE_BLOCK_DESC_UXN | PTE_BLOCK_DESC_AP_USER | PTE_BLOCK_DESC_NG | MMU_MT_NORMAL_FLAGS)
+#define MMU_UDATA_FLAGS             (PTE_BLOCK_DESC_AP_RW | PTE_BLOCK_DESC_PXN | PTE_BLOCK_DESC_AP_USER | PTE_BLOCK_DESC_NG | PTE_BLOCK_DESC_UXN | MMU_MT_NORMAL_FLAGS)
 
 /* I/O region flags */
 
@@ -240,7 +268,7 @@
 
 /* Flags for kernel page tables */
 
-#define MMU_KPGT_FLAGS              (0)
+#define MMU_KPGT_FLAGS              (PTE_TABLE_DESC)
 
 /* Kernel FLASH and RAM are mapped globally */
 
@@ -358,7 +386,7 @@ static inline void mmu_invalidate_tlb_by_vaddr(uintptr_t vaddr)
       "dsb ish\n"
       "isb"
       :
-      : "r" (vaddr)
+      : "r" (TLBI_ARG(vaddr, 0))
       : "memory"
     );
 }
@@ -599,6 +627,28 @@ void mmu_ln_restore(uint32_t ptlevel, uintptr_t lnvaddr, uintptr_t vaddr,
  ****************************************************************************/
 
 size_t mmu_get_region_size(uint32_t ptlevel);
+
+/****************************************************************************
+ * Name: mmu_get_base_pgt_level
+ *
+ * Description:
+ *   Get the base translation table level. The ARM64 MMU implementation
+ *   optimizes the amount of translation table levels in use, based on the
+ *   configured virtual address range (CONFIG_ARM64_VA_BITS).
+ *
+ *   Table indices range from 0...3 and the lowest table indices are dropped
+ *   as needed. If CONFIG_ARM64_VA_BITS >= 40, all 4 translation table levels
+ *   are needed.
+ *
+ * Input Parameters:
+ *   None.
+ *
+ * Returned Value:
+ *   The base translation table level.
+ *
+ ****************************************************************************/
+
+uintptr_t mmu_get_base_pgt_level(void);
 
 #endif /* __ASSEMBLY__ */
 

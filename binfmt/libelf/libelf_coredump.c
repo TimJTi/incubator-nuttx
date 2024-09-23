@@ -1,6 +1,8 @@
 /****************************************************************************
  * binfmt/libelf/libelf_coredump.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -267,7 +269,7 @@ static void elf_emit_tcb_note(FAR struct elf_dumpinfo_s *cinfo,
     {
       if (up_interrupt_context())
         {
-          regs = (FAR uintptr_t *)CURRENT_REGS;
+          regs = (FAR uintptr_t *)up_current_regs();
         }
       else
         {

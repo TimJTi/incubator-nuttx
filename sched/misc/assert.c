@@ -1,6 +1,8 @@
 /****************************************************************************
  * sched/misc/assert.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,7 @@
 #include <nuttx/board.h>
 #include <nuttx/coredump.h>
 #include <nuttx/fs/fs.h>
+#include <nuttx/init.h>
 #include <nuttx/irq.h>
 #include <nuttx/tls.h>
 #include <nuttx/signal.h>
@@ -92,7 +95,7 @@
 
 static uintptr_t
 g_last_regs[XCPTCONTEXT_REGS] aligned_data(XCPTCONTEXT_ALIGN);
-static FAR const char *g_policy[4] =
+static FAR const char * const g_policy[4] =
 {
   "FIFO", "RR", "SPORADIC"
 };
@@ -210,7 +213,7 @@ static void dump_stack(FAR const char *tag, uintptr_t sp,
 static void dump_stacks(FAR struct tcb_s *rtcb, uintptr_t sp)
 {
 #if CONFIG_ARCH_INTERRUPTSTACK > 0
-  uintptr_t intstack_base = up_get_intstackbase(up_cpu_index());
+  uintptr_t intstack_base = up_get_intstackbase(this_cpu());
   size_t intstack_size = CONFIG_ARCH_INTERRUPTSTACK;
   uintptr_t intstack_top = intstack_base + intstack_size;
   uintptr_t intstack_sp = 0;
@@ -259,13 +262,13 @@ static void dump_stacks(FAR struct tcb_s *rtcb, uintptr_t sp)
                  intstack_base,
                  intstack_size,
 #ifdef CONFIG_STACK_COLORATION
-                 up_check_intstack(up_cpu_index())
+                 up_check_intstack(this_cpu())
 #else
                  0
 #endif
                  );
 
-      tcbstack_sp = up_getusrsp((FAR void *)CURRENT_REGS);
+      tcbstack_sp = up_getusrsp((FAR void *)up_current_regs());
       if (tcbstack_sp < tcbstack_base || tcbstack_sp >= tcbstack_top)
         {
           tcbstack_sp = 0;
@@ -419,7 +422,7 @@ static void dump_backtrace(FAR struct tcb_s *tcb, FAR void *arg)
  * Name: dump_filelist
  ****************************************************************************/
 
-#ifdef CONFIG_SCHED_DUMP_ON_EXIT
+#ifdef CONFIG_DUMP_ON_EXIT
 static void dump_filelist(FAR struct tcb_s *tcb, FAR void *arg)
 {
   FAR struct filelist *filelist = &tcb->group->tg_filelist;
@@ -509,7 +512,7 @@ static void dump_tasks(void)
   nxsched_foreach(dump_backtrace, NULL);
 #endif
 
-#ifdef CONFIG_SCHED_DUMP_ON_EXIT
+#ifdef CONFIG_DUMP_ON_EXIT
   nxsched_foreach(dump_filelist, NULL);
 #endif
 }
@@ -569,6 +572,7 @@ static void pause_all_cpu(void)
 void _assert(FAR const char *filename, int linenum,
              FAR const char *msg, FAR void *regs)
 {
+  const bool os_ready = OSINIT_OS_READY();
   FAR struct tcb_s *rtcb = running_task();
 #if CONFIG_TASK_NAME_SIZE > 0
   FAR struct tcb_s *ptcb = NULL;
@@ -585,14 +589,18 @@ void _assert(FAR const char *filename, int linenum,
     }
 #endif
 
-  flags = enter_critical_section();
+  flags = 0; /* suppress GCC warning */
+  if (os_ready)
+    {
+      flags = enter_critical_section();
+    }
 
   if (g_fatal_assert)
     {
       goto reset;
     }
 
-  if (fatal)
+  if (os_ready && fatal)
     {
 #ifdef CONFIG_SMP
       pause_all_cpu();
@@ -738,5 +746,8 @@ reset:
 #endif
     }
 
-  leave_critical_section(flags);
+  if (os_ready)
+    {
+      leave_critical_section(flags);
+    }
 }
