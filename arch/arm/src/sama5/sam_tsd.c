@@ -660,21 +660,16 @@ static void sam_tsd_bottomhalf(void *arg)
 
           ier &= ~pending & TSD_ALLREADY;
 
-          /* datasheet says that if TSAV != 0 there may not be interrupts
-           * for TSD channels so periodic or continuous triggers are needed.
-           * Note: We may be already using periodic triggers (for std adc
+          /* datasheet says that if TSAV != 0 and trigger mode is PEN
+           * there may not be interrupts for TSD channels so periodic or
+           * continuous triggers are needed.
+           * Note: We may be already using those triggers (for std adc
            * ops).
-           * Real world testing shows that if we don't enforce Periodic
-           * triggers - regardless of TSAV value - we still miss samples.
-           * 
-           * This probably warrants a future revisit.
            */
 
 #ifdef SAMA5_TSD_TRIG_CHANGE_ALLOWED
-#  if 0
           regval  = sam_adc_getreg(priv->adc, SAM_ADC_TSMR);
           if ((regval & ADC_TSMR_TSAV_MASK) != 0)
-#  endif
             {
               regval = sam_adc_getreg(priv->adc, SAM_ADC_TRGR);
 
