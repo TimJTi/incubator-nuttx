@@ -125,13 +125,16 @@
 #define GD55_JEDEC_MEMORY_TYPE          0x47  /* GD55B memory Type*/
 #define GD55_JEDEC_GD55B01GE_CAPACITY   0x1b  /* GD55B01GE memory capacity */
 
-/* GD55B01GE (128 MB) memory capacity */
+/* GD55 devices all have identical sector sizes etc. */
 
-#define GD55B01GE_SECTOR_SIZE      (4*1024)
-#define GD55B01GE_SECTOR_SHIFT     (8)
-#define GD55B01GE_SECTOR_COUNT     (4096)
-#define GD55B01GE_PAGE_SIZE        (256)
-#define GD55B01GE_PAGE_SHIFT       (8)
+#define GD55_SECTOR_SIZE      (4*1024)
+#define GD55_SECTOR_SHIFT     (12)
+#define GD55_PAGE_SIZE        (256)
+#define GD55_PAGE_SHIFT       (8)
+
+/* GD55B01GE (128 MiB) memory capacity */
+
+#define GD55B01GE_SECTOR_COUNT     (32768)
 
 /* Status register 1 bit definitions */
 
@@ -879,8 +882,8 @@ int gd55_readid(FAR struct gd55_dev_s *dev)
   switch (dev->cmdbuf[2])
     {
       case GD55_JEDEC_GD55B01GE_CAPACITY:
-        dev->sectorshift = GD55B01GE_SECTOR_SHIFT;
-        dev->pageshift   = GD55B01GE_PAGE_SHIFT;
+        dev->sectorshift = GD55_SECTOR_SHIFT;
+        dev->pageshift   = GD55_PAGE_SHIFT;
         dev->nsectors    = GD55B01GE_SECTOR_COUNT;
         break;      
 
