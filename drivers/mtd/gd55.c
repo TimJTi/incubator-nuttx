@@ -188,6 +188,7 @@
 
 /* Non-volatile and volatile config register addresses and bits             */
 
+#define GD55_NUM_NV_REGISTERS   6
 #define GD55_DUMMY_CYCLES_REG   1         /* Dummy Cycle Configuration      */
 #define GD55_ODT_DS_REG         3         /* On-die termination and driver
                                            * strength configuration
@@ -197,7 +198,7 @@
 #define GD55_PROT_MODE_WPS      (0 << 2)  /* 0 = Sector Protect mode        */
 #define GD55_PROT_MODE_BP       (1 << 2)  /* 1 = Block Protect mode (def.)  */
 #define GD55_4BYTE_MODE_REG     5         /* 3 pr 4-byte address mode       */
-#define GD55 XIP_MODE_REG       6         /* XIP (continuous read) mode     */
+#define GD55_XIP_MODE_REG       6         /* XIP (continuous read) mode     */
 #define GD55_WRAP_CONFIG_REG    7         /* Wrap mode (none/64/32/16 byte) */
 
 /* Block protection bit */
@@ -589,8 +590,8 @@ static int gd55_write_page(FAR struct gd55_dev_s *priv,
 
   if ((address + buflen) >= MODE_3BYTE_LIMIT)
     {
-    gd55_command(priv, GD55_EN4B);
-    meminfo.addrlen = 4;
+      gd55_command(priv, GD55_EN4B);
+      meminfo.addrlen = 4;
     }
   else
     {
@@ -1067,7 +1068,7 @@ static int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
           ret = gd55_erase_64kblock(priv, startblock);
           if (ret < 0)
             {
-              return ret;
+              goto unlock;
             }
 
           startblock += sectorsper64kblock;
@@ -1083,7 +1084,7 @@ static int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
           ret = gd55_erase_32kblock(priv, startblock);
           if (ret < 0)
             {
-              return ret;
+              goto unlock;
             }
 
           startblock += sectorsper32kblock;
@@ -1098,7 +1099,7 @@ static int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
           ret = gd55_erase_sector(priv, startblock);
           if (ret < 0)
             {
-              return ret;
+              goto unlock;
             }
 
           startblock++;
@@ -1109,9 +1110,11 @@ static int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
     }
 #endif
 
+  ret = (int)nblocks;
+unlock:
   gd55_unlock(priv);
 
-  return (int)nblocks;
+  return ret;
 }
 
 /****************************************************************************
@@ -1318,7 +1321,8 @@ static int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
       case BIOC_PARTINFO:
         {
           FAR struct partition_info_s *info =
-            (FAR struct partition_info_s *)arg;
+              (FAR struct partition_info_s *)arg;
+
           if (info != NULL)
             {
 #ifdef CONFIG_MTD_GD55_SECTOR512
@@ -1881,7 +1885,7 @@ static int gd55_write_cache(FAR struct gd55_dev_s *priv,
                                size_t nsectors)
 {
   FAR uint8_t *dest;
-  int ret;
+  int         ret;
 
   for (; nsectors > 0; nsectors--)
     {
@@ -1960,9 +1964,8 @@ FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
                                       bool unprotect)
 {
   FAR struct gd55_dev_s *dev;
-  int ret;
-  uint8_t status;
-  uint16_t config;
+  int                   ret;
+  uint8_t               status;
 
   DEBUGASSERT(qspi != NULL);
 
@@ -1975,7 +1978,6 @@ FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
    */
 
   dev = kmm_zalloc(sizeof(*dev));
-
   if (dev == NULL)
     {
       ferr("Failed to allocate mtd device\n");
@@ -2017,6 +2019,13 @@ FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
       goto exit_free_readbuf;
     }
 
+  ret = gd55_readid(dev);
+  if (ret != OK)
+    {
+      ferr("Unable to reset GD55 QSPI Flash\n");
+      goto exit_free_readbuf;
+    }
+
   /* Unprotect all FLASH sectors if so requested. */
 
   if (unprotect)
@@ -2043,12 +2052,13 @@ FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
     }
 #endif
 
+  status = gd55_read_status1(dev);
+
   /* Avoid compiler warnings in case info logs are disabled */
 
   UNUSED(status);
-  UNUSED(config);
 
-  finfo("device ready 0x%02x 0x%04x\n", status, config);
+  finfo("device ready Status  = 0x%02x\n", status);
 
   /* Return the implementation-specific state structure as the MTD device */
 
