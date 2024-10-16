@@ -923,6 +923,41 @@ config MX25RXX_LXX
 
 endif # MTD_MX25RXX
 
+config MTD_GD55
+	bool "QuadSPI-based GigaDevices GD55 family FLASH"
+	default n
+	---help---
+		Support GD55 QSPI devices
+
+if MTD_GD55
+
+config MTD_GD55_QSPIMODE
+	int "MTD_GD55 QuadSPI Mode"
+	default 0
+	---help---
+		This device can operate in SPI mode 0 or 3.
+
+config MTD_GD55_QSPI_FREQUENCY
+	int "MTD_GD55 QuadSPI Frequency"
+	default 133000000
+	---help---
+		Clock frequency for all SPI commands except for Read Data
+		command. Dual and Quad read methods need different frequency
+		in low power mode (Only Quad read is supported in this driver).
+
+config MTD_GD55_QSPI_READ_FREQUENCY
+	int "MTD_GD55 QuadSPI Read command frequency"
+	default 6000000
+	---help---
+		Clock frequency for read data command.
+		Only Quad read is supported in this driver.
+
+config MTD_GD55_SECTOR512
+	bool "Simulate 512 byte Erase Blocks"
+	default n
+
+endif # MTD_GD55
+
 config MTD_SMART
 	bool "Sector Mapped Allocation for Really Tiny (SMART) Flash support"
 	default n
