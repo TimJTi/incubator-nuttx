@@ -122,8 +122,10 @@
 
 #define GD55_JEDEC_MANUFACTURER         0xc8  /* GigaDevice manufacturer ID */
 
-#define GD55_JEDEC_MEMORY_TYPE          0x47  /* GD55B memory Type*/
-#define GD55_JEDEC_GD55B01GE_CAPACITY   0x1b  /* GD55B01GE memory capacity */
+#define GD55B_JEDEC_MEMORY_TYPE          0x47  /* GD55B memory type, 3V   */
+#define GD55L_JEDEC_MEMORY_TYPE          0x67  /* GD55L memory type, 1.8V */
+#define GD55_JEDEC_1G_CAPACITY           0x1b  /* 1Gbit memory capacity   */
+#define GD55_JEDEC_2G_CAPACITY           0x1c  /* 2Gbit memory capacity   */
 
 /* GD55 devices all have identical sector sizes etc. */
 
@@ -132,9 +134,13 @@
 #define GD55_PAGE_SIZE        (256)
 #define GD55_PAGE_SHIFT       (8)
 
-/* GD55B01GE (128 MiB) memory capacity */
+/* GD55B01xx (128 MiB) memory capacity */
 
-#define GD55B01GE_SECTOR_COUNT     (32768)
+#define GD55xx1G_SECTOR_COUNT     (32768)
+
+/* GD55B02xx (256 MiB) memory capacity */
+
+#define GD55xx2G_SECTOR_COUNT     (65536)
 
 /* Status register 1 bit definitions */
 
@@ -192,19 +198,19 @@
 
 struct gd55_dev_s
 {
-  struct mtd_dev_s       mtd;         /* MTD interface */
-  FAR struct qspi_dev_s *qspi;        /* QuadSPI interface */
+  struct mtd_dev_s       mtd;         /* MTD interface                      */
+  FAR struct qspi_dev_s *qspi;        /* QuadSPI interface                  */
 
-  FAR uint8_t           *cmdbuf;      /* Allocated command buffer */
+  FAR uint8_t           *cmdbuf;      /* Allocated command buffer           */
 
-  uint8_t                sectorshift; /* Log2 of sector size */
-  uint8_t                pageshift;   /* Log2 of page size */
-  uint16_t               nsectors;    /* Number of erase sectors */
+  uint8_t                sectorshift; /* Log2 of sector size                */
+  uint8_t                pageshift;   /* Log2 of page size                  */
+  uint32_t               nsectors;    /* Number of erase sectors            */
 
 #ifdef CONFIG_GD55_SECTOR512
-  uint8_t                flags;       /* Buffered sector flags */
-  uint16_t               esectno;     /* Erase sector number in the cache */
-  FAR uint8_t           *sector;      /* Allocated sector data */
+  uint8_t                flags;       /* Buffered sector flags              */
+  uint16_t               esectno;     /* Erase sector number in the cache   */
+  FAR uint8_t           *sector;      /* Allocated sector data              */
 #endif
 };
 
@@ -867,10 +873,11 @@ int gd55_readid(FAR struct gd55_dev_s *dev)
   finfo("Manufacturer: %02x Device Type %02x, Capacity: %02x\n",
         dev->cmdbuf[0], dev->cmdbuf[1], dev->cmdbuf[2]);
 
-  /* Check for GigaDeviced GD55 chip */
+  /* Check for GigaDevices GD55 chip */
 
-  if (dev->cmdbuf[0] != GD55_JEDEC_MANUFACTURER ||
-      dev->cmdbuf[1] != GD55_JEDEC_MEMORY_TYPE)
+  if (dev->cmdbuf[0] != GD55_JEDEC_MANUFACTURER &&
+      (dev->cmdbuf[1] != GD55L_JEDEC_MEMORY_TYPE ||
+       dev->cmdbuf[1] != GD55B_JEDEC_MEMORY_TYPE))
     {
       ferr("ERROR: Unrecognized device type: 0x%02x 0x%02x\n",
            dev->cmdbuf[0], dev->cmdbuf[1]);
@@ -881,11 +888,17 @@ int gd55_readid(FAR struct gd55_dev_s *dev)
 
   switch (dev->cmdbuf[2])
     {
-      case GD55_JEDEC_GD55B01GE_CAPACITY:
+      case GD55_JEDEC_1G_CAPACITY:
         dev->sectorshift = GD55_SECTOR_SHIFT;
         dev->pageshift   = GD55_PAGE_SHIFT;
-        dev->nsectors    = GD55B01GE_SECTOR_COUNT;
+        dev->nsectors    = GD55xx1G_SECTOR_COUNT;
         break;      
+
+      case GD55_JEDEC_2G_CAPACITY:
+        dev->sectorshift = GD55_SECTOR_SHIFT;
+        dev->pageshift   = GD55_PAGE_SHIFT;
+        dev->nsectors    = GD55xx2G_SECTOR_COUNT;
+        break;   
 
       default:
         ferr("ERROR: Unsupported memory capacity: %02x\n", dev->cmdbuf[2]);
