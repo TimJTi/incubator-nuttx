@@ -945,12 +945,17 @@ config MTD_GD55_QSPI_FREQUENCY
 		command. Dual and Quad read methods need different frequency
 		in low power mode (Only Quad read is supported in this driver).
 
+config MTD_GD55_QSPI_QREAD_FREQUENCY
+	int "MTD_GD55 QuadSPI Quad Read command frequency"
+	default 90000000
+	---help---
+		Clock frequency for Quad I/O fast read data command.
+
 config MTD_GD55_QSPI_READ_FREQUENCY
 	int "MTD_GD55 QuadSPI Read command frequency"
 	default 6000000
 	---help---
-		Clock frequency for read data command.
-		Only Quad read is supported in this driver.
+		Clock frequency for basic read data command.
 
 config MTD_GD55_SECTOR512
 	bool "Simulate 512 byte Erase Blocks"

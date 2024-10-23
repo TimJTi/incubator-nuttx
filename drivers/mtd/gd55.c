@@ -214,6 +214,13 @@ struct gd55_dev_s
 #endif
 };
 
+enum qspifreq_e
+{
+  READ = CONFIG_MTD_GD55_QSPI_READ_FREQUENCY,
+  FAST_QREAD = CONFIG_MTD_GD55_QSPI_QREAD_FREQUENCY,
+  OTHER = CONFIG_MTD_GD55_QSPI_FREQUENCY,
+};
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -233,7 +240,7 @@ static int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd,
 
 /* Internal driver methods */
 
-static void gd55_lock(FAR struct qspi_dev_s *qspi, bool read);
+static void gd55_lock(FAR struct qspi_dev_s *qspi, enum qspifreq_e freq);
 static void gd55_unlock(FAR struct qspi_dev_s *qspi);
 static int gd55_command_read(FAR struct qspi_dev_s *qspi, uint8_t cmd,
                              FAR void *buffer, size_t buflen);
@@ -281,7 +288,7 @@ static int  gd55_write_cache(FAR struct gd55_dev_s *priv,
  * Private Functions
  ****************************************************************************/
 
-void gd55_lock(FAR struct qspi_dev_s *qspi, bool read)
+void gd55_lock(FAR struct qspi_dev_s *qspi, enum qspifreq_e freq)
 {
   /* On SPI buses where there are multiple devices, it will be necessary to
    * lock SPI to have exclusive access to the buses for a sequence of
@@ -302,9 +309,9 @@ void gd55_lock(FAR struct qspi_dev_s *qspi, bool read)
 
   QSPI_SETMODE(qspi, CONFIG_MTD_GD55_QSPIMODE);
   QSPI_SETBITS(qspi, 8);
-  QSPI_SETFREQUENCY(qspi,
-     read ? CONFIG_MTD_GD55_QSPI_READ_FREQUENCY :
-            CONFIG_MTD_GD55_QSPI_FREQUENCY);
+  QSPI_SETFREQUENCY(qspi, freq);
+     //read ? CONFIG_MTD_GD55_QSPI_READ_FREQUENCY :
+     //       CONFIG_MTD_GD55_QSPI_FREQUENCY);
 }
 
 void gd55_unlock(FAR struct qspi_dev_s *qspi)
@@ -608,7 +615,7 @@ int gd55_erase(FAR struct mtd_dev_s *dev,
 
   /* Lock access to the SPI bus until we complete the erase */
 
-  gd55_lock(priv->qspi, false);
+  gd55_lock(priv->qspi, OTHER);
 
   while (blocksleft-- > 0)
     {
@@ -710,7 +717,7 @@ ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
 
   /* Lock the QuadSPI bus and write all of the pages to FLASH */
 
-  gd55_lock(priv->qspi, false);
+  gd55_lock(priv->qspi, OTHER);
 
 #if defined(CONFIG_GD55_SECTOR512)
   ret = gd55_write_cache(priv, buf, startblock, nblocks);
@@ -743,7 +750,7 @@ ssize_t gd55_read(FAR struct mtd_dev_s *dev, off_t offset, size_t nbytes,
 
   /* Lock the QuadSPI bus and select this FLASH part */
 
-  gd55_lock(priv->qspi, true);
+  gd55_lock(priv->qspi, FAST_QREAD);
   ret = gd55_read_byte(priv, buffer, offset, nbytes);
   gd55_unlock(priv->qspi);
 
@@ -832,7 +839,7 @@ int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
         {
           /* Erase the entire device */
 
-          gd55_lock(priv->qspi, false);
+          gd55_lock(priv->qspi, OTHER);
           ret = gd55_erase_chip(priv);
           gd55_unlock(priv->qspi);
         }
@@ -860,7 +867,7 @@ int gd55_readid(FAR struct gd55_dev_s *dev)
 {
   /* Lock the QuadSPI bus and configure the bus. */
 
-  gd55_lock(dev->qspi, true);
+  gd55_lock(dev->qspi, READ);
 
   /* Read the JEDEC ID */
 
@@ -1209,7 +1216,7 @@ FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
     }
 #endif
 
-  gd55_lock(dev->qspi, false);
+  gd55_lock(dev->qspi, OTHER);
 
 #if 0 /* TO DO */
   /* Set MTD device in low power mode, with minimum dummy cycles */
