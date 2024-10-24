@@ -46,86 +46,84 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#undef CONFIG_GD55_QSPI_READ_FREQUENCY
-#undef CONFIG_GD55_QSPI_FREQUENCY
+#define BYTE3_MODE_LIMIT (16 * 1024 * 1024) /* 4 byte addressing needed for
+                                             * addresses higher than 16Mbyte
+                                             */
 
 /* GD55 Commands */
 
-#define GD55_NOP          0x00  /* No Operation                             */
-#define GD55_READ         0x03  /* Read data bytes                          */
-#define GD55_FAST_READ    0x0b  /* Higher speed read                        */
-#define GD55_4READ        0xeb  /* 4 x I/O read command                     */
-#define GD55_QREAD        0x6b  /* Quad read command                        */
-#define GD55_4BREAD       0x13  /* 4-byte read                              */
-#define GD55_4B_FAST_READ 0x0c  /* 4-byte higher speed read                 */
-#define GD55_4B_QREAD     0x6c  /* 4-byte quad output read                  */
-#define GD55_4B_QREAD     0xec  /* 4-byte quad I/O read                     */
-#define GD55_4B_QDTRREAD  0xee  /* 4-byte quad I/O DTR fast read            */
-#define GD55_PP           0x02  /* Page program                             */
-#define GD55_QPP          0x32  /* Quad page program                        */
-#define GD55_EQPP         0xc2  /* Extended quad page program               */
-#define GD55_4PP          0x12  /* 4-byte page program                      */
-#define GD55_4QPP         0x34  /* 4-byte quad page program                 */
-#define GD55_4EQPP        0x3e  /* 4-byte extended quad page program        */
-
-#define GD55_SE           0x20  /* 4Kb Sector erase                         */
-#define GD55_BE32         0x52  /* 32Kbit block Erase                       */
-#define GD55_BE64         0xd8  /* 64Kbit block Erase                       */
-#define GD55_CE           0xc7  /* Chip erase                               */
-#define GD55_CE_ALT       0x60  /* Chip erase (alternate)                   */
-
-#define GD55_WREN         0x06  /* Write Enable                             */
-#define GD55_WRDI         0x04  /* Write Disable                            */
-#define GD55_EARR         0xc8  /* Read extended address register           */
-#define GD55_RDSR1        0x05  /* Read status register 1                   */
-#define GD55_RDSR2        0x35  /* Read status register 1                   */
-#define GD55_RDNVCR       0xb5  /* Read Non-Volatile config register        */
-#define GD55_RDVCR        0x85  /* Read Volatile config register            */
-#define GD55_WR1SR        0x01  /* Write status register 1                  */
-#define GD55_WR2SR2       0x31  /* Write status register 2                  */
-#define GD55_WRNVCR       0xb1  /* Write Non-Volatile config register       */
-#define GD55_WRENVSC      0x50  /* Write enable, Volatile config register   */
-#define GD55_WRVCR        0x91  /* Write Volatile config register           */
-#define GD55_WREAR        0xc5  /* Write Extended address register          */
-
-#define GD55_RDID         0x9e  /* Read identification                      */
-#define GD55_RDID_ALT     0x9f  /* Read identification (alternate)          */
-#define GD55_RUID         0x4b  /* Read Unique ID                           */
-#define GD55_RSFDP        0x5a  /* Read Serial Flash Discoverable Parameter */
-
-#define GD55_DP           0xb9  /* Deep power down                          */
-#define GD55_RDP          0xab  /* Release deep power down                  */
-#define GD55_PE_SUSPEND   0x75  /* Suspends program/erase                   */
-#define GD55_PE_RESUME    0x7a  /* Resume program                           */
-#define GD55_RDSCUR       0x48  /* Read security register                   */
-#define GD55_WRSCUR       0x42  /* Write security register                  */
-#define GD55_ERSCUR       0x44  /* Erase security register                  */
-#define GD55_RSTEN        0x66  /* Reset Enable                             */
-#define GD55_RST          0x99  /* Reset Memory                             */
-
-#define GD55_QPIEN        0x38  /* Enable QPI Operation (not supported)     */
-#define GD55_EN4B         0xb7  /* Enable 4 byte Addressing Mode            */
-#define GD55_DIS4B        0xe9  /* Disable 4 byte Addressing Mode           */
-
-#define GD55_IBSL         0x36  /* Individual block/sector lock             */
-#define GD55_IBSUL        0x39  /* Individual block/sector unlock           */
-#define GD55_RIBSL        0x3d  /* Read individual block/sector lock        */
-#define GD55_GBSL         0x7e  /* Global block/sector lock                 */
-#define GD55_GBSUL        0x98  /* Global block/sector unlock               */
-
+#define GD55_READ             0x03  /* Read data bytes                      */
+#define GD55_READ_ALT         0x13  /* Alternate read data bytes            */
+#define GD55_FAST_READ        0x0b  /* Higher speed read                    */
+#define GD55_FAST_READ_ALT    0x0c  /* Alternate higher speed read          */
+#define GD55_QREAD            0x6b  /* Quad output fast read                */
+#define GD55_QREAD_ALT        0x6c  /* Aternate quad output fast read       */
+#define GD55_QC_READ          0xeb  /* Quad output continuous fast read     */
+#define GD55_QC_READ_ALT      0xec  /* Quad output continuous fast read     */
+#define GD55_4B_QDTR_READ     0xed  /* Quad I/O DTR read                    */
+#define GD55_4B_QDTR_READ_ALT 0xee  /* Alternate quad I/O DTR read          */
+#define GD55_PP               0x02  /* Page program (SPI, not used)         */
+#define GD55_PP_ALT           0x12  /* Aternate page program (SPI)          */
+#define GD55_QPP              0x32  /* Quad page program                    */
+#define GD55_QPP_ALT          0x34  /* ALternate quad page program          */
+#define GD55_EQPP             0xc2  /* Extended quad page program           */
+#define GD55_EQPP_ALT         0x3e  /* ALternate extended quad page program */
+#define GD55_SE               0x20  /* 4Kb Sector erase                     */
+#define GD55_SE_ALT           0x21  /* Alternate 4Kb Sector erase           */
+#define GD55_BE32             0x52  /* 32Kbit block Erase                   */
+#define GD55_BE32_ALT         0x5c  /* Alternate 32Kbit block Erase         */
+#define GD55_BE64             0xd8  /* 64Kbit block Erase                   */
+#define GD55_BE64_ALT         0xd8  /* ALternate 64Kbit block Erase         */
+#define GD55_CE               0x60  /* Chip erase (alternate)               */
+#define GD55_CE_ALT           0xc7  /* Alternate chip erase                 */
+#define GD55_QPIEN            0x38  /* Enable QPI Operation                 */
+#define GD55_QPIDIS           0xff  /* Disable QPI Operation                */
+#define GD55_DP               0xb9  /* Deep power down                      */
+#define GD55_RDP              0xab  /* Release deep power down              */
+#define GD55_RUID             0x4b  /* Read Unique ID                       */
+#define GD55_RDID             0x9e  /* Read identification                  */
+#define GD55_RDID_ALT         0x9f  /* Read identification (alternate)      */
+#define GD55_PE_SUSPEND       0x75  /* Suspends program/erase               */
+#define GD55_PE_RESUME        0x7a  /* Resume program                       */
+#define GD55_WREN             0x06  /* Write Enable                         */
+#define GD55_WRDI             0x04  /* Write Disable                        */
+#define GD55_EARR             0xc8  /* Read extended address register       */
+#define GD55_RDSR1            0x05  /* Read status register 1               */
+#define GD55_RDSR2            0x35  /* Read status register 1               */
+#define GD55_RDNVCR           0xb5  /* Read Non-Volatile config register    */
+#define GD55_RDVCR            0x85  /* Read Volatile config register        */
+#define GD55_WR1SR            0x01  /* Write status register 1              */
+#define GD55_WR2SR2           0x31  /* Write status register 2              */
+#define GD55_WRNVCR           0xb1  /* Write Non-Volatile config register   */
+#define GD55_WRENVSC          0x50  /* Write ee., Volatile config register  */
+#define GD55_WRVCR            0x91  /* Write Volatile config register       */
+#define GD55_WREAR            0xc5  /* Write Extended address register      */
+#define GD55_RSFDP            0x5a  /* Read Serial Flash Discoverable Param */
+#define GD55_RDSCUR           0x48  /* Read security register               */
+#define GD55_WRSCUR           0x42  /* Write security register              */
+#define GD55_ERSCUR           0x44  /* Erase security register              */
+#define GD55_RSTEN            0x66  /* Reset Enable                         */
+#define GD55_RST              0x99  /* Reset Memory                         */
+#define GD55_EN4B             0xb7  /* Enable 4 byte Addressing Mode        */
+#define GD55_DIS4B            0xe9  /* Disable 4 byte Addressing Mode       */
+#define GD55_IBSL             0x36  /* Individual block/sector lock         */
+#define GD55_IBSUL            0x39  /* Individual block/sector unlock       */
+#define GD55_RIBSL            0x3d  /* Read individual block/sector lock    */
+#define GD55_GBSL             0x7e  /* Global block/sector lock             */
+#define GD55_GBSUL            0x98  /* Global block/sector unlock           */
 
 /* Read ID (RDID) register values */
 
-#define GD55_MANUFACTURER 0xc8  /* Macronix manufacturer ID */
+#define GD55_MANUFACTURER 0xc8  /* GigaSevice manufacturer ID               */
 
-/* JEDEC Read ID register values */
+/* JEDEC Read ID register values                                            */
 
-#define GD55_JEDEC_MANUFACTURER         0xc8  /* GigaDevice manufacturer ID */
+#define GD55_JEDEC_MANUFACTURER 0xc8 /* GigaDevice manufacturer ID          */
 
-#define GD55B_JEDEC_MEMORY_TYPE          0x47  /* GD55B memory type, 3V   */
-#define GD55L_JEDEC_MEMORY_TYPE          0x67  /* GD55L memory type, 1.8V */
-#define GD55_JEDEC_1G_CAPACITY           0x1b  /* 1Gbit memory capacity   */
-#define GD55_JEDEC_2G_CAPACITY           0x1c  /* 2Gbit memory capacity   */
+#define GD55B_JEDEC_MEMORY_TYPE 0x47 /* GD55B memory type, 3V               */
+#define GD55L_JEDEC_MEMORY_TYPE 0x67 /* GD55L memory type, 1.8V             */
+#define GD55_JEDEC_1G_CAPACITY  0x1b /* 1Gbit memory capacity               */
+#define GD55_JEDEC_2G_CAPACITY  0x1c /* 2Gbit memory capacity               */
 
 /* GD55 devices all have identical sector sizes etc. */
 
@@ -200,13 +198,10 @@ struct gd55_dev_s
 {
   struct mtd_dev_s       mtd;         /* MTD interface                      */
   FAR struct qspi_dev_s *qspi;        /* QuadSPI interface                  */
-
   FAR uint8_t           *cmdbuf;      /* Allocated command buffer           */
-
   uint8_t                sectorshift; /* Log2 of sector size                */
   uint8_t                pageshift;   /* Log2 of page size                  */
   uint32_t               nsectors;    /* Number of erase sectors            */
-
 #ifdef CONFIG_GD55_SECTOR512
   uint8_t                flags;       /* Buffered sector flags              */
   uint16_t               esectno;     /* Erase sector number in the cache   */
@@ -214,12 +209,11 @@ struct gd55_dev_s
 #endif
 };
 
-enum qspifreq_e
+typedef enum 
 {
-  READ = CONFIG_MTD_GD55_QSPI_READ_FREQUENCY,
-  FAST_QREAD = CONFIG_MTD_GD55_QSPI_QREAD_FREQUENCY,
-  OTHER = CONFIG_MTD_GD55_QSPI_FREQUENCY,
-};
+  SPIREAD_FREQ = CONFIG_MTD_GD55_SPI_READ_FREQUENCY,
+  QSPI_FREQ    = CONFIG_MTD_GD55_QSPI_FREQUENCY,
+} qspifreq_t;
 
 /****************************************************************************
  * Private Function Prototypes
@@ -240,7 +234,7 @@ static int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd,
 
 /* Internal driver methods */
 
-static void gd55_lock(FAR struct qspi_dev_s *qspi, enum qspifreq_e freq);
+static void gd55_lock(FAR struct qspi_dev_s *qspi, qspifreq_t freq);
 static void gd55_unlock(FAR struct qspi_dev_s *qspi);
 static int gd55_command_read(FAR struct qspi_dev_s *qspi, uint8_t cmd,
                              FAR void *buffer, size_t buflen);
@@ -288,7 +282,7 @@ static int  gd55_write_cache(FAR struct gd55_dev_s *priv,
  * Private Functions
  ****************************************************************************/
 
-void gd55_lock(FAR struct qspi_dev_s *qspi, enum qspifreq_e freq)
+void gd55_lock(FAR struct qspi_dev_s *qspi, qspifreq_t freq)
 {
   /* On SPI buses where there are multiple devices, it will be necessary to
    * lock SPI to have exclusive access to the buses for a sequence of
@@ -391,22 +385,42 @@ int gd55_command_address(FAR struct qspi_dev_s *qspi, uint8_t cmd,
 int gd55_read_byte(FAR struct gd55_dev_s *dev, FAR uint8_t *buffer,
                       off_t address, size_t buflen)
 {
+  bool byte4_mode = false;
+  int ret;
   struct qspi_meminfo_s meminfo;
 
-  finfo("address: %08lx nbytes: %d\n", (long)address, (int)buflen);
 
+
+  /* Check if any address exceeds range of 3 byte addressing */
+
+  if ((address + buflen) > BYTE3_MODE_LIMIT)
+    {
+      gd55_command(dev->qspi, GD55_EN4B);
+      byte4_mode = true;
+      meminfo.addrlen = 4;
+    }
+  else
+    {
+      meminfo.addrlen = 3;
+    }
+
+  finfo("4byte mode: %s address: %08lx nbytes: %d\n",
+         byte4_mode ? "true" : "false", (long)address, (int)buflen);
+  
   meminfo.flags   = QSPIMEM_READ | QSPIMEM_QUADIO;
-  meminfo.addrlen = 3;
-
-  /* Ignore performance enhanced mode => 2+4 dummies */
-
   meminfo.dummies = 6;
   meminfo.buflen  = buflen;
-  meminfo.cmd     = GD55_4READ;
+  meminfo.cmd     = GD55_QREAD;
   meminfo.addr    = address;
   meminfo.buffer  = buffer;
 
-  return QSPI_MEMORY(dev->qspi, &meminfo);
+  ret = QSPI_MEMORY(dev->qspi, &meminfo);
+  if (byte4_mode)
+    {
+      gd55_command(dev->qspi, GD55_DIS4B);
+    }
+
+  return ret;
 }
 
 int gd55_write_page(FAR struct gd55_dev_s *priv,
@@ -419,17 +433,30 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
   int ret;
   int i;
 
-  finfo("address: %08lx buflen: %u\n",
-        (unsigned long)address, (unsigned)buflen);
-
   npages   = (buflen >> priv->pageshift);
   pagesize = (1 << priv->pageshift);
+
+  /* Check if address exceeds range of 3 byte addressing */
+
+  if ((address + buflen) > BYTE3_MODE_LIMIT)
+    {
+      gd55_command(priv->qspi, GD55_EN4B);
+      meminfo.addrlen = 4;
+    }
+  else
+  {
+      meminfo.addrlen = 3;
+  }
+
+  finfo("4byte mode: %s address: %08lx buflen: %u\n",
+        (meminfo.addrlen == 4) ? "true" : "false", (unsigned long)address,
+        (unsigned)buflen);
+
 
   /* Set up non-varying parts of transfer description */
 
   meminfo.flags   = QSPIMEM_WRITE | QSPIMEM_QUADIO;
   meminfo.cmd     = GD55_QPP;
-  meminfo.addrlen = 3;
   meminfo.buflen  = pagesize;
   meminfo.dummies = 0;
 
@@ -470,6 +497,11 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
     }
   while ((ret & GD55_SR_WIP) != 0);
 
+  if (  meminfo.addrlen == 4)
+    {
+      gd55_command(priv->qspi, GD55_DIS4B);
+    }
+  
   return OK;
 }
 
@@ -477,17 +509,27 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 {
   off_t address;
   uint8_t status;
-
-  finfo("sector: %08lx\n", (unsigned long)sector);
+  bool byte4_mode = false;
 
   /* Get the address associated with the sector */
 
   address = (off_t)sector << priv->sectorshift;
 
+  /* Check if address exceeds range of 3 byte addressing */
+
+  if (address > BYTE3_MODE_LIMIT)
+    {
+      gd55_command(priv->qspi, GD55_EN4B);
+      byte4_mode = true;
+    }
+
+  finfo("4byte mode: %s sector: %08lx\n", byte4_mode ? "true" : "false",
+                                          (unsigned long)sector);
+
   /* Send the sector erase command */
 
   gd55_write_enable(priv, true);
-  gd55_command_address(priv->qspi, GD55_SE, address, 3);
+  gd55_command_address(priv->qspi, GD55_SE, address, byte4_mode ? 4 : 3);
 
   /* Wait for erasure to finish */
 
@@ -498,6 +540,11 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
       status = priv->cmdbuf[0];
     }
   while ((status & GD55_SR_WIP) != 0);
+
+  if (byte4_mode)
+    {
+      gd55_command(priv->qspi, GD55_DIS4B);
+    }
 
   return OK;
 }
@@ -550,6 +597,11 @@ int gd55_erase_chip(FAR struct gd55_dev_s *priv)
     }
 
   return OK;
+}
+
+static void gd55_enable_4byte_addressing(FAR struct gd55_dev_s *priv)
+{
+
 }
 
 void gd55_write_enable(FAR struct gd55_dev_s *dev, bool enable)
@@ -615,7 +667,7 @@ int gd55_erase(FAR struct mtd_dev_s *dev,
 
   /* Lock access to the SPI bus until we complete the erase */
 
-  gd55_lock(priv->qspi, OTHER);
+  gd55_lock(priv->qspi, QSPI_FREQ);
 
   while (blocksleft-- > 0)
     {
@@ -717,7 +769,7 @@ ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
 
   /* Lock the QuadSPI bus and write all of the pages to FLASH */
 
-  gd55_lock(priv->qspi, OTHER);
+  gd55_lock(priv->qspi, QSPI_FREQ);
 
 #if defined(CONFIG_GD55_SECTOR512)
   ret = gd55_write_cache(priv, buf, startblock, nblocks);
@@ -750,7 +802,7 @@ ssize_t gd55_read(FAR struct mtd_dev_s *dev, off_t offset, size_t nbytes,
 
   /* Lock the QuadSPI bus and select this FLASH part */
 
-  gd55_lock(priv->qspi, FAST_QREAD);
+  gd55_lock(priv->qspi, QSPI_FREQ);
   ret = gd55_read_byte(priv, buffer, offset, nbytes);
   gd55_unlock(priv->qspi);
 
@@ -839,7 +891,7 @@ int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
         {
           /* Erase the entire device */
 
-          gd55_lock(priv->qspi, OTHER);
+          gd55_lock(priv->qspi, QSPI_FREQ);
           ret = gd55_erase_chip(priv);
           gd55_unlock(priv->qspi);
         }
@@ -867,7 +919,7 @@ int gd55_readid(FAR struct gd55_dev_s *dev)
 {
   /* Lock the QuadSPI bus and configure the bus. */
 
-  gd55_lock(dev->qspi, READ);
+  gd55_lock(dev->qspi, SPIREAD_FREQ);
 
   /* Read the JEDEC ID */
 
@@ -1216,7 +1268,7 @@ FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
     }
 #endif
 
-  gd55_lock(dev->qspi, OTHER);
+  gd55_lock(dev->qspi, QSPI_FREQ);
 
 #if 0 /* TO DO */
   /* Set MTD device in low power mode, with minimum dummy cycles */
