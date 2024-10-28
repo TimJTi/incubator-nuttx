@@ -208,17 +208,19 @@
 
 /* QSPI Memory Transfer Flags */
 
-#define QSPIMEM_READ          (0)       /* Bit 2: 0=Memory read data transfer */
+#define QSPIMEM_READ          (0)       /* Bit 2: 0=Memory read data transfer  */
+#define QSPIMEM_QUADOUT       (1 << 1)  /* Bit 1: Use Quad Output mode         */
 #define QSPIMEM_WRITE         (1 << 2)  /* Bit 2: 1=Memory write data transfer */
-#define QSPIMEM_DUALIO        (1 << 3)  /* Bit 3: Use Dual I/O (READ only) */
-#define QSPIMEM_QUADIO        (1 << 4)  /* Bit 4: Use Quad I/O (READ only) */
-#define QSPIMEM_SCRAMBLE      (1 << 5)  /* Bit 5: Scramble data */
-#define QSPIMEM_RANDOM        (1 << 6)  /* Bit 6: Use random key in scrambler */
-#define QSPIMEM_IDUAL         (1 << 7)  /* Bit 7: Instruction on two lines */
-#define QSPIMEM_IQUAD         (1 << 0)  /* Bit 0: Instruction on four lines */
+#define QSPIMEM_DUALIO        (1 << 3)  /* Bit 3: Use Dual I/O (READ only)     */
+#define QSPIMEM_QUADIO        (1 << 4)  /* Bit 4: Use Quad I/O (READ only)     */
+#define QSPIMEM_SCRAMBLE      (1 << 5)  /* Bit 5: Scramble data                */
+#define QSPIMEM_RANDOM        (1 << 6)  /* Bit 6: Use random key in scrambler  */
+#define QSPIMEM_IDUAL         (1 << 7)  /* Bit 7: Instruction on two lines     */
+#define QSPIMEM_IQUAD         (1 << 0)  /* Bit 0: Instruction on four lines    */
 
 #define QSPIMEM_ISREAD(f)     (((f) & QSPIMEM_WRITE) == 0)
 #define QSPIMEM_ISWRITE(f)    (((f) & QSPIMEM_WRITE) != 0)
+#define QSPIMEM_ISQUADOUT(f)  (((f) & QSPIMEM_QUADOUT) != 0)
 #define QSPIMEM_ISDUALIO(f)   (((f) & QSPIMEM_DUALIO) != 0)
 #define QSPIMEM_ISQUADIO(f)   (((f) & QSPIMEM_QUADIO) != 0)
 #define QSPIMEM_ISSCRAMBLE(f) (((f) & QSPIMEM_SCRAMBLE) != 0)

@@ -794,6 +794,10 @@ static int qspi_memory_enable(struct sam_qspidev_s *priv,
     {
       regval |= QSPI_IFR_WIDTH_DUALIO;
     }
+  else if (QSPIMEM_ISQUADOUT(meminfo->flags))
+    {
+      regval |= QSPI_IFR_WIDTH_QUADOUT;
+    }
   else
     {
       regval |= QSPI_IFR_WIDTH_SINGLE;
@@ -1127,6 +1131,9 @@ static uint32_t qspi_setfrequency(struct qspi_dev_s *dev, uint32_t frequency)
 #if CONFIG_SAMA5_QSPI_DLYBCT > 0
   uint32_t dlybct;
 #endif
+#if CONFIG_SAMA5_QSPI_DLYCS > 0
+  uint32_t dlycs;
+#endif
   uint32_t regval;
 
   spiinfo("frequency=%"PRIu32"\n", frequency);
@@ -1206,9 +1213,15 @@ static uint32_t qspi_setfrequency(struct qspi_dev_s *dev, uint32_t frequency)
    */
 
   regval  = qspi_getreg(priv, SAM_QSPI_MR_OFFSET);
-  regval &= ~QSPI_MR_DLYBCT_MASK;
+
+#if CONFIG_SAMA5_QSPI_DLYCS > 0
+  regval &= ~QSPI_MR_DLYCS_MASK;
+  dlycs   = (CONFIG_SAMA5_QSPI_DLYCS * (SAM_QSPI_CLOCK / 1000000)) / 1000;
+  regval |= dlycs << QSPI_MR_DLYCS_SHIFT;
+#endif
 
 #if CONFIG_SAMA5_QSPI_DLYBCT > 0
+  regval &= ~QSPI_MR_DLYBCT_MASK;
   dlybct  = ((CONFIG_SAMA5_QSPI_DLYBCT * (SAM_QSPI_CLOCK / 1000000))
               / 1000 / 32);
   regval |= dlybct << QSPI_MR_DLYBCT_SHIFT;
