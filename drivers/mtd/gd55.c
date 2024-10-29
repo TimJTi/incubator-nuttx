@@ -54,7 +54,7 @@
  * address, i.e. 16Mbyte
  */
 
-#define MODE_LIMIT_3BYTES ((16 * 1024 * 1024))
+#define MODE_3BYTE_LIMIT ((16 * 1024 * 1024))
 
 /* GD55 Commands */
 
@@ -67,13 +67,14 @@
 #define GD55_QREAD_DUMMIES      8
 #define GD55_QC_READ            0xeb  /* Quad output continuous fast read   */
 #define GD55_QC_READ_ALT        0xec  /* Quad output continuous fast read   */
-#define GD55_QC_READ_DUMMIES    6
+#define GD55_QC_READ_DUMMIES    8
 #define GD55_4B_QDTR_READ       0xed  /* Quad I/O DTR read                  */
 #define GD55_4B_QDTR_READ_ALT   0xee  /* Alternate quad I/O DTR read        */
 #define GD55_PP                 0x02  /* Page program (SPI, not used)       */
 #define GD55_PP_ALT             0x12  /* Aternate page program (SPI)        */
 #define GD55_QPP                0x32  /* Quad page program                  */
 #define GD55_QPP_ALT            0x34  /* ALternate quad page program        */
+#define GD55_QPP_DUMMIES        0     /* No dummy clocks                    */
 #define GD55_EQPP               0xc2  /* Extended quad page program         */
 #define GD55_EQPP_ALT           0x3e  /* Alternate ext. quad page program   */
 #define GD55_EQPP_DUMMIES       0     /* No dummy clocks                    */
@@ -260,9 +261,8 @@ static int gd55_write_page(FAR struct gd55_dev_s *priv,
                            size_t buflen);
 static int gd55_erase_sector(FAR struct gd55_dev_s *priv,
                              off_t sector);
-#if 0 /* FIXME:  Not used */
-static int gd55_erase_block(FAR struct gd55_dev_s *priv, off_t block);
-#endif
+static int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector);
+static int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector);
 static int gd55_erase_chip(FAR struct gd55_dev_s *priv);
 #ifdef CONFIG_MTD_GD55_SECTOR512
 static int  gd55_flush_cache(FAR struct gd55_dev_s *priv);
@@ -362,37 +362,36 @@ int gd55_command_address(FAR struct qspi_dev_s *qspi, uint8_t cmd,
 int gd55_read_byte(FAR struct gd55_dev_s *dev, FAR uint8_t *buffer,
                    off_t address, size_t buflen)
 {
-  bool                  byte4_mode;
+  bool                  mode_4byte_addr;
   int                   ret;
   struct qspi_meminfo_s meminfo;
 
   /* Check if any address exceeds range of 3 byte addressing */
 
-  if ((address + buflen) >= MODE_LIMIT_3BYTES)
+  if ((address + buflen) >= MODE_3BYTE_LIMIT)
     {
       gd55_command(dev->qspi, GD55_EN4B);
-      byte4_mode = true;
-      meminfo.addrlen = 4;
+      mode_4byte_addr = true;
     }
   else
     {
       gd55_command(dev->qspi, GD55_DIS4B);
-      byte4_mode = false;
-      meminfo.addrlen = 3;
+      mode_4byte_addr = false;
     }
 
   finfo("4byte mode: %s address: %08lx nbytes: %d\n",
-         byte4_mode ? "true" : "false", (long)address, (int)buflen);
+         mode_4byte_addr ? "true" : "false", (long)address, (int)buflen);
 
   meminfo.flags   = QSPIMEM_READ | QSPIMEM_QUADOUT;
   meminfo.dummies = GD55_QREAD_DUMMIES;
   meminfo.buflen  = buflen;
-  meminfo.cmd     = GD55_QREAD;
+  meminfo.cmd     = mode_4byte_addr ? GD55_QREAD_ALT : GD55_QREAD;
   meminfo.addr    = address;
+  meminfo.addrlen = mode_4byte_addr ? 4 : 3;
   meminfo.buffer  = buffer;
 
   ret = QSPI_MEMORY(dev->qspi, &meminfo);
-  if (byte4_mode)
+  if (mode_4byte_addr)
     {
       gd55_command(dev->qspi, GD55_DIS4B);
     }
@@ -413,23 +412,24 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
 
   /* Check if address exceeds range of 3 byte addressing */
 
-  if ((address + buflen) >= MODE_LIMIT_3BYTES)
+  if ((address + buflen) >= MODE_3BYTE_LIMIT)
     {
-      gd55_command(priv->qspi, GD55_EN4B);
-      meminfo.addrlen = 4;
+    gd55_command(priv->qspi, GD55_EN4B);
+    meminfo.addrlen = 4;
     }
   else
     {
-        meminfo.addrlen = 3;
+      gd55_command(priv->qspi, GD55_DIS4B);
+      meminfo.addrlen = 3;
     }
 
   finfo("4byte mode: %s address: %08lx buflen: %u\n",
         (meminfo.addrlen == 4) ? "true" : "false", (unsigned long)address,
         (unsigned)buflen);
-
+  
   /* Set up non-varying parts of transfer description */
 
-  meminfo.flags   = QSPIMEM_WRITE | QSPIMEM_QUADOUT;
+  meminfo.flags   = QSPIMEM_WRITE | QSPIMEM_QUADIO;
   meminfo.cmd     = GD55_EQPP;
   meminfo.buflen  = GD55_PAGE_SIZE;
   meminfo.dummies = GD55_EQPP_DUMMIES;
@@ -447,7 +447,6 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
 
       gd55_write_enable(priv, true);
       ret = QSPI_MEMORY(priv->qspi, &meminfo);
-      gd55_write_enable(priv, false);
 
       if (ret < 0)
         {
@@ -483,7 +482,10 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 {
   off_t address;
   uint8_t status;
-  bool byte4_mode = false;
+  bool mode_4byte_addr = false;
+
+  finfo("4byte mode: %s\tsector: %08lx\n", mode_4byte_addr ? "true" : "false",
+                                          (unsigned long)sector);
 
   /* Get the address associated with the sector */
 
@@ -491,31 +493,30 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 
   /* Check if address exceeds range of 3 byte addressing */
 
-  if (address >= MODE_LIMIT_3BYTES)
+  if (address >= MODE_3BYTE_LIMIT)
     {
       gd55_command(priv->qspi, GD55_EN4B);
-      byte4_mode = true;
+      mode_4byte_addr = true;
     }
-
-  finfo("4byte mode: %s sector: %08lx\n", byte4_mode ? "true" : "false",
-                                          (unsigned long)sector);
 
   /* Send the sector erase command */
 
   gd55_write_enable(priv, true);
-  gd55_command_address(priv->qspi, GD55_SE, address, byte4_mode ? 4 : 3);
+  gd55_command_address(priv->qspi, mode_4byte_addr ? GD55_SE_ALT : GD55_SE,
+                                   address,
+                                   mode_4byte_addr ? 4 : 3);
 
   /* Wait for erasure to finish */
 
   do
     {
-      nxsig_usleep(10 * 1000); /* Nominal sector erase time is 30ms */
+      nxsig_usleep(10 * 1000); /* Typical sector erase time is 30ms */
       gd55_read_status(priv);
       status = priv->cmdbuf[0];
     }
   while ((status & GD55_SR_WIP) != 0);
 
-  if (byte4_mode)
+  if (mode_4byte_addr)
     {
       gd55_command(priv->qspi, GD55_DIS4B);
     }
@@ -523,31 +524,88 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
   return OK;
 }
 
-#if 0 /* FIXME:  Not used */
-int gd55_erase_block(FAR struct gd55_dev_s *priv, off_t block)
+int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
 {
+  off_t address;
   uint8_t status;
+  bool mode_4byte_addr = false;
 
-  finfo("block: %08lx\n", (unsigned long)block);
+  finfo("4byte mode: %s\tsector: %08lx\n", mode_4byte_addr ? "true" : "false",
+                                          (unsigned long)sector);
+  address = sector << GD55_SECTOR_SHIFT;
+
+  if (address >= MODE_3BYTE_LIMIT)
+    {
+      gd55_command(priv->qspi, GD55_EN4B);
+      mode_4byte_addr = true;
+    }
 
   /* Send the 64k block erase command */
 
   gd55_write_enable(priv, true);
-  gd55_command_address(priv->qspi, GD55_BE64, block << 16, 3);
+  gd55_command_address(priv->qspi, mode_4byte_addr ? GD55_BE64_ALT : GD55_BE64,
+                                   address,
+                                   mode_4byte_addr ? 4 : 3);  
 
   /* Wait for erasure to finish */
 
   do
     {
-      nxsig_usleep(300 * 1000);
+      nxsig_usleep(50 * 1000); /* typical 64k erase time is 220ms */
       gd55_read_status(priv);
       status = priv->cmdbuf[0];
     }
   while ((status & GD55_SR_WIP) != 0);
 
+  if (mode_4byte_addr)
+    {
+      gd55_command(priv->qspi, GD55_DIS4B);
+    }
+
   return OK;
 }
-#endif
+
+int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
+{
+  off_t address;
+  uint8_t status;
+  bool mode_4byte_addr = false;
+
+  finfo("4byte mode: %s/tsector: %08lx\n", mode_4byte_addr ? "true" : "false",
+                                          (unsigned long)sector);
+
+  address = sector <<= GD55_SECTOR_SHIFT;
+
+  if (address >= MODE_3BYTE_LIMIT)
+    {
+      gd55_command(priv->qspi, GD55_EN4B);
+      mode_4byte_addr = true;
+    }
+
+  /* Send the 32k block erase command */
+
+  gd55_write_enable(priv, true);
+  gd55_command_address(priv->qspi, mode_4byte_addr ? GD55_BE64_ALT : GD55_BE32,
+                                   address,
+                                   mode_4byte_addr ? 4 : 3);   
+
+  /* Wait for erasure to finish */
+
+  do
+    {
+      nxsig_usleep(50 * 1000); /* typical 32k erase time is 150ms */
+      gd55_read_status(priv);
+      status = priv->cmdbuf[0];
+    }
+  while ((status & GD55_SR_WIP) != 0);
+
+  if (mode_4byte_addr)
+    {
+      gd55_command(priv->qspi, GD55_DIS4B);
+    }
+
+  return OK;
+}
 
 int gd55_erase_chip(FAR struct gd55_dev_s *priv)
 {
@@ -595,10 +653,12 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
                                           size_t nblocks)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
-  size_t blocksleft = nblocks;
+  size_t sectorsleft = nblocks;
 #ifdef CONFIG_MTD_GD55_SECTOR512
   int ret;
 #endif
+  const size_t sectorsper64kblock = (64 * 1024) >> GD55_SECTOR_SHIFT;
+  const size_t sectorsper32kblock = (32 * 1024) >> GD55_SECTOR_SHIFT;
 
   finfo("startblock: %08lx nblocks: %d\n", (long)startblock, (int)nblocks);
 
@@ -606,19 +666,14 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
 
   gd55_lock(priv->qspi, QSPI_FREQ);
 
-  while (blocksleft-- > 0)
+#ifdef CONFIG_MTD_GD55_SECTOR512
+  while (sectorsleft-- > 0)
     {
       /* Erase each sector */
-
-#ifdef CONFIG_MTD_GD55_SECTOR512
       gd55_erase_cache(priv, startblock);
-#else
-      gd55_erase_sector(priv, startblock);
-#endif
       startblock++;
     }
 
-#ifdef CONFIG_MTD_GD55_SECTOR512
   /* Flush the last erase block left in the cache */
 
   ret = gd55_flush_cache(priv);
@@ -626,26 +681,33 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
     {
       nblocks = ret;
     }
-#endif
-
-#if 0
-  /* FIXME: use gd55_erase_block in case CONFIG_MTD_GD55_SECTOR512 is
-   * not configured to speed up block erase.
-   */
-
-  unsigned int sectorsperblock = (64 * 1024) >> GD55_SECTOR_SHIFT;
-  while (blocksleft > 0)
+#else
+  while (sectorsleft > 0)
     {
-      /* Check if current block is aligned on 64k block to speed up erase */
+      /* Check if block is aligned on 64k or 32k block for faster erase */
 
-      if (((startblock & (sectorsperblock - 1)) == 0) &&
-          (blocksleft >= sectorsperblock))
+      DEBUGASSERT (startblock < GD551G_SECTOR_COUNT);
+      if (((startblock & (sectorsper64kblock - 1)) == 0) &&
+          (sectorsleft >= sectorsper64kblock))
         {
           /* Erase 64k block */
 
-          gd55_erase_block(priv, startblock >> (16 - GD55_SECTOR_SHIFT));
-          startblock += sectorsperblock;
-          blocksleft -= sectorsperblock;
+          gd55_erase_64kblock(priv, startblock);
+          startblock += sectorsper64kblock;
+          sectorsleft -= sectorsper64kblock;
+          finfo("Erased 64kbytes at address 0x%08" PRIx32 "\n",
+                 startblock << GD55_SECTOR_SHIFT);
+        }
+      else if (((startblock & (sectorsper32kblock - 1)) == 0) &&
+          (sectorsleft >= sectorsper32kblock))
+        {
+          /* Erase 32k block */
+
+          gd55_erase_32kblock(priv, startblock);
+          startblock += sectorsper32kblock;
+          sectorsleft -= sectorsper32kblock;
+          finfo("Erased 32kbytes at address 0x%08" PRIx32 "\n",
+                 startblock << GD55_SECTOR_SHIFT);
         }
       else
         {
@@ -653,7 +715,9 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
 
           gd55_erase_sector(priv, startblock);
           startblock++;
-          blocksleft--;
+          sectorsleft--;
+          finfo("Erased 4kbytes at address 0x%08" PRIx32 "\n",
+                 startblock << GD55_SECTOR_SHIFT);
         }
     }
 #endif
