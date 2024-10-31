@@ -198,7 +198,6 @@
                                                                /* Instruction Address-Option Data */
 #  define QSPI_IFR_WIDTH_SINGLE    (0 << QSPI_IFR_WIDTH_SHIFT) /* Single-bit  Single-bit     Single-bit */
 #  define QSPI_IFR_WIDTH_DUALOUT   (1 << QSPI_IFR_WIDTH_SHIFT) /* Single-bit  Single-bit     Dual */
-#  define QSPI_IFR_WIDTH_QUADOUT   (2 << QSPI_IFR_WIDTH_SHIFT) /* Single-bit  Single-bit     Quad */
 #  define QSPI_IFR_WIDTH_DUALIO    (3 << QSPI_IFR_WIDTH_SHIFT) /* Single-bit  Dual           Dual */
 #  define QSPI_IFR_WIDTH_QUADIO    (4 << QSPI_IFR_WIDTH_SHIFT) /* Single-bit  Quad           Quad */
 #  define QSPI_IFR_WIDTH_DUALCMD   (5 << QSPI_IFR_WIDTH_SHIFT) /* Dual        Dual           Dual */

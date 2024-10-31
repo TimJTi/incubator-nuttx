@@ -794,10 +794,6 @@ static int qspi_memory_enable(struct sam_qspidev_s *priv,
     {
       regval |= QSPI_IFR_WIDTH_DUALIO;
     }
-  else if (QSPIMEM_ISQUADOUT(meminfo->flags))
-    {
-      regval |= QSPI_IFR_WIDTH_QUADOUT;
-    }
   else
     {
       regval |= QSPI_IFR_WIDTH_SINGLE;
