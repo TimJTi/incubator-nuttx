@@ -933,22 +933,17 @@ if MTD_GD55
 
 config MTD_GD55_QSPIMODE
 	int "MTD_GD55 QuadSPI Mode"
-	default 0
+	default 3
 	---help---
 		This device can operate in SPI mode 0 or 3.
 
-config MTD_GD55_QSPI_FREQUENCY
+config MTD_GD55_FREQUENCY
 	int "MTD_GD55 QSPI Frequency"
 	default 133000000
 	---help---
 		Clock frequency for all instructions except for non-QSPI read
-		commands (e.g. Read ID) and DTR read (not used in this driver)
-
-config MTD_GD55_SPI_READ_FREQUENCY
-	int "MTD_GD55 SPI Read command frequency"
-	default 60000000
-	---help---
-		Clock frequency for non-QSPI reads such as readid
+		commands (e.g. Read ID) and DTR read, neither of which are used in
+		this driver)
 
 config MTD_GD55_SECTOR512
 	bool "Simulate 512 byte Erase Blocks"
