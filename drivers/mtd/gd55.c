@@ -670,6 +670,7 @@ void gd55_write_enable(FAR struct gd55_dev_s *dev)
 static uint8_t gd55_read_status1(FAR struct gd55_dev_s *dev)
 {
   uint8_t status;
+
   gd55_command_read(dev->qspi, GD55_RDSR1, &status, 1);
   return status;
 }
@@ -677,6 +678,7 @@ static uint8_t gd55_read_status1(FAR struct gd55_dev_s *dev)
 static uint8_t gd55_read_status2(FAR struct gd55_dev_s *dev)
 {
   uint8_t status;
+
   gd55_command_read(dev->qspi, GD55_RDSR2, &status, 1);
   return status;
 }
