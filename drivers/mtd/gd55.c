@@ -257,7 +257,8 @@ static bool     gd55_isprotected(FAR struct gd55_dev_s *priv, uint8_t status,
 static int      gd55_read_byte(FAR struct gd55_dev_s *dev,
                                FAR uint8_t *buffer, off_t address,
                                size_t buflen);
-static uint8_t *gd55_read_status(FAR struct gd55_dev_s *dev);
+static void     gd55_read_status(FAR struct gd55_dev_s *dev,
+                                 uint8_t status[2]);
 static void     gd55_write_status(FAR struct gd55_dev_s *dev);
 static void     gd55_write_enable(FAR struct gd55_dev_s *dev);
 static int      gd55_write_page(FAR struct gd55_dev_s *priv,
@@ -495,7 +496,7 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
 
       do
         {
-          *status = gd55_read_status(priv);
+          gd55_read_status(priv, status);
         }
       while ((status[0] & GD55_SR_WIP) != 0);
     }
@@ -537,7 +538,7 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
   do
     {
       nxsig_usleep(10 * 1000); /* Typical sector erase time is 30ms */
-      *status = gd55_read_status(priv);
+      gd55_read_status(priv, status);
     }
   while ((status[0] & GD55_SR_WIP) != 0);
 
@@ -578,7 +579,7 @@ int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
   do
     {
       nxsig_usleep(50 * 1000); /* typical 64k erase time is 220ms */
-      *status = gd55_read_status(priv);
+      gd55_read_status(priv, status);
     }
   while ((status[0] & GD55_SR_WIP) != 0);
 
@@ -619,7 +620,7 @@ int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
   do
     {
       nxsig_usleep(50 * 1000); /* typical 32k erase time is 150ms */
-      *status = gd55_read_status(priv);
+      gd55_read_status(priv, status);
     }
   while ((status[0] & GD55_SR_WIP) != 0);
 
@@ -643,12 +644,12 @@ int gd55_erase_chip(FAR struct gd55_dev_s *priv)
 
   /* Wait for the erasure to complete */
 
-  *status = gd55_read_status(priv);
+  gd55_read_status(priv, status);
 
   while ((status[0] & GD55_SR_WIP) != 0)
     {
       nxsig_sleep(2);
-      *status = gd55_read_status(priv);
+      gd55_read_status(priv, status);
     }
 
   return OK;
@@ -661,15 +662,15 @@ void gd55_write_enable(FAR struct gd55_dev_s *dev)
   gd55_command(dev->qspi, GD55_WREN);
   do
     {
-      *status = gd55_read_status(dev);
+      gd55_read_status(dev, status);
     }
   while ((status[0] & GD55_SR_WEL) != GD55_SR_WEL);
 }
 
-static uint8_t *gd55_read_status(FAR struct gd55_dev_s *dev)
+static void gd55_read_status(FAR struct gd55_dev_s *dev,
+                                 uint8_t status[2])
 {
-  gd55_command_read(dev->qspi, GD55_RDSR, (FAR void *)&dev->readbuf, 2);
-  return dev->readbuf;
+  gd55_command_read(dev->qspi, GD55_RDSR, &status, 2);
 }
 
 void gd55_write_status(FAR struct gd55_dev_s *dev)
@@ -689,7 +690,7 @@ void gd55_write_status(FAR struct gd55_dev_s *dev)
 
   do
     {
-      *status = gd55_read_status(dev);
+      gd55_read_status(dev, status);
     }
   while ((status[0] & GD55_SR_WIP) != 0);
 }
@@ -1037,7 +1038,7 @@ static int gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
 
   /* Check if sector protection registers are locked */
 
-  *status = gd55_read_status(priv);
+  gd55_read_status(priv, status);
   if ((status[0] & GD55_SR_SRP0) || (status[1] & GD55_SR_SRP1))
     {
       /* Status register cannot be written to as device is in
@@ -1082,7 +1083,7 @@ static int gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
     }
 
   gd55_write_status(priv);
-  *status = gd55_read_status(priv);
+  gd55_read_status(priv, status);
   if ((status[0] & GD55_SR_BP_MASK) != (priv->cmdbuf[0] & GD55_SR_BP_MASK))
     {
       return -EACCES; /* Likely that the external HW WP# pin is asserted */
@@ -1103,7 +1104,7 @@ static int gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
 
   /* Check if sector protection registers are locked */
 
-  *status = gd55_read_status(priv);
+  gd55_read_status(priv, status);
   if ((status[0] & GD55_SR_SRP0) || (status[1] & GD55_SR_SRP1))
     {
       /* Status register cannot be written to as device is in
@@ -1141,7 +1142,7 @@ static int gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
     }
 
   gd55_write_status(priv);
-  *status = gd55_read_status(priv);
+  gd55_read_status(priv, status);
   if ((status[0] & GD55_SR_BP_MASK) != (priv->cmdbuf[0] & GD55_SR_BP_MASK))
     {
       return -EACCES; /* Likely that the external HW WP# pin is asserted */
