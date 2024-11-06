@@ -946,8 +946,13 @@ config MTD_GD55_FREQUENCY
 		this driver)
 
 config MTD_GD55_SECTOR512
-	bool "Simulate 512 byte Erase Blocks"
+	bool "Emulate 512 byte Erase Blocks"
 	default n
+	---help---
+		This is used to map the native 256 byte sectors to 512 byte sectors.
+		It is useful if using a file system that demands 512 byte sectors,
+		such as FAT
+
 
 endif # MTD_GD55
 
