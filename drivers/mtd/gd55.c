@@ -66,7 +66,8 @@
 #define GD55_CE                 0x60  /* Chip erase (alternate)             */
 #define GD55_WREN               0x06  /* Write Enable                       */
 #define GD55_WRDI               0x04  /* Write Disable                      */
-#define GD55_RDSR               0x05  /* Read status register               */
+#define GD55_RDSR1              0x05  /* Read status register 1             */
+#define GD55_RDSR2              0x35  /* Read status register 2             */
 #define GD55_WRSR1              0x01  /* Write status register 1            */
 #define GD55_EN4B               0xb7  /* Enable 4 byte Addressing Mode      */
 #define GD55_DIS4B              0xe9  /* Disable 4 byte Addressing Mode     */
@@ -96,7 +97,6 @@
 #define GD55_RDID_ALT           0x9f  /* Read identification (alternate)    */
 #define GD55_PE_SUSPEND         0x75  /* Suspends program/erase             */
 #define GD55_PE_RESUME          0x7a  /* Resume program                     */
-#define GD55_RDSR_ALT           0x35  /* Alternate read status register 1   */
 #define GD55_RDNVCR             0xb5  /* Read Non-Volatile config register  */
 #define GD55_RDVCR              0x85  /* Read Volatile config register      */
 #define GD55_WRSR2              0x31  /* Write status register 2            */
@@ -257,8 +257,8 @@ static bool     gd55_isprotected(FAR struct gd55_dev_s *priv, uint8_t status,
 static int      gd55_read_byte(FAR struct gd55_dev_s *dev,
                                FAR uint8_t *buffer, off_t address,
                                size_t buflen);
-static void     gd55_read_status(FAR struct gd55_dev_s *dev,
-                                 uint8_t status[2]);
+static uint8_t  gd55_read_status1(FAR struct gd55_dev_s *dev);
+static uint8_t  gd55_read_status2(FAR struct gd55_dev_s *dev);
 static void     gd55_write_status(FAR struct gd55_dev_s *dev);
 static void     gd55_write_enable(FAR struct gd55_dev_s *dev);
 static int      gd55_write_page(FAR struct gd55_dev_s *priv,
@@ -435,7 +435,7 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
                     off_t address, size_t buflen)
 {
   struct qspi_meminfo_s meminfo;
-  uint8_t status[2];
+  uint8_t status;
   unsigned int npages;
   int ret;
   int i;
@@ -496,9 +496,9 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
 
       do
         {
-          gd55_read_status(priv, status);
+          status = gd55_read_status1(priv);
         }
-      while ((status[0] & GD55_SR_WIP) != 0);
+      while ((status & GD55_SR_WIP) != 0);
     }
 
   if (meminfo.addrlen == 4)
@@ -511,7 +511,7 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
 
 int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 {
-  uint8_t status[2];
+  uint8_t status;
   bool mode_4byte_addr = false;
   off_t address = sector << GD55_SECTOR_SHIFT;
 
@@ -538,9 +538,9 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
   do
     {
       nxsig_usleep(10 * 1000); /* Typical sector erase time is 30ms */
-      gd55_read_status(priv, status);
+      status = gd55_read_status1(priv);
     }
-  while ((status[0] & GD55_SR_WIP) != 0);
+  while ((status & GD55_SR_WIP) != 0);
 
   if (mode_4byte_addr)
     {
@@ -579,9 +579,9 @@ int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
   do
     {
       nxsig_usleep(50 * 1000); /* typical 64k erase time is 220ms */
-      gd55_read_status(priv, status);
+      status = gd55_read_status1(priv);
     }
-  while ((status[0] & GD55_SR_WIP) != 0);
+  while ((status & GD55_SR_WIP) != 0);
 
   if (mode_4byte_addr)
     {
@@ -620,9 +620,9 @@ int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
   do
     {
       nxsig_usleep(50 * 1000); /* typical 32k erase time is 150ms */
-      gd55_read_status(priv, status);
+      status = gd55_read_status1(priv);
     }
-  while ((status[0] & GD55_SR_WIP) != 0);
+  while ((status & GD55_SR_WIP) != 0);
 
   if (mode_4byte_addr)
     {
@@ -635,7 +635,7 @@ int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
 
 int gd55_erase_chip(FAR struct gd55_dev_s *priv)
 {
-  uint8_t status[2];
+  uint8_t status;
 
   /* Erase the whole chip */
 
@@ -644,12 +644,12 @@ int gd55_erase_chip(FAR struct gd55_dev_s *priv)
 
   /* Wait for the erasure to complete */
 
-  gd55_read_status(priv, status);
+  status = gd55_read_status1(priv);
 
-  while ((status[0] & GD55_SR_WIP) != 0)
+  while ((status & GD55_SR_WIP) != 0)
     {
       nxsig_sleep(2);
-      gd55_read_status(priv, status);
+      status = gd55_read_status1(priv);
     }
 
   return OK;
@@ -657,25 +657,33 @@ int gd55_erase_chip(FAR struct gd55_dev_s *priv)
 
 void gd55_write_enable(FAR struct gd55_dev_s *dev)
 {
-  uint8_t status[2];
+  uint8_t status;
 
   gd55_command(dev->qspi, GD55_WREN);
   do
     {
-      gd55_read_status(dev, status);
+      status = gd55_read_status1(dev);
     }
-  while ((status[0] & GD55_SR_WEL) != GD55_SR_WEL);
+  while ((status & GD55_SR_WEL) != GD55_SR_WEL);
 }
 
-static void gd55_read_status(FAR struct gd55_dev_s *dev,
-                                 uint8_t status[2])
+static uint8_t gd55_read_status1(FAR struct gd55_dev_s *dev)
 {
-  gd55_command_read(dev->qspi, GD55_RDSR, &status, 2);
+  uint8_t status;
+  gd55_command_read(dev->qspi, GD55_RDSR1, &status, 1);
+  return status;
+}
+
+static uint8_t gd55_read_status2(FAR struct gd55_dev_s *dev)
+{
+  uint8_t status;
+  gd55_command_read(dev->qspi, GD55_RDSR2, &status, 1);
+  return status;
 }
 
 void gd55_write_status(FAR struct gd55_dev_s *dev)
 {
-  uint8_t status[2];
+  uint8_t status;
 
   gd55_write_enable(dev);
 
@@ -690,9 +698,9 @@ void gd55_write_status(FAR struct gd55_dev_s *dev)
 
   do
     {
-      gd55_read_status(dev, status);
+      status = gd55_read_status1(dev);
     }
-  while ((status[0] & GD55_SR_WIP) != 0);
+  while ((status & GD55_SR_WIP) != 0);
 }
 
 int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
@@ -1038,7 +1046,8 @@ static int gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
 
   /* Check if sector protection registers are locked */
 
-  gd55_read_status(priv, status);
+  status[0] = gd55_read_status1(priv);
+  status[1] = gd55_read_status2(priv);
   if ((status[0] & GD55_SR_SRP0) || (status[1] & GD55_SR_SRP1))
     {
       /* Status register cannot be written to as device is in
@@ -1083,7 +1092,7 @@ static int gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
     }
 
   gd55_write_status(priv);
-  gd55_read_status(priv, status);
+  status[0] = gd55_read_status1(priv);
   if ((status[0] & GD55_SR_BP_MASK) != (priv->cmdbuf[0] & GD55_SR_BP_MASK))
     {
       return -EACCES; /* Likely that the external HW WP# pin is asserted */
@@ -1104,7 +1113,8 @@ static int gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
 
   /* Check if sector protection registers are locked */
 
-  gd55_read_status(priv, status);
+  status[0] = gd55_read_status1(priv);
+  status[1] = gd55_read_status2(priv);
   if ((status[0] & GD55_SR_SRP0) || (status[1] & GD55_SR_SRP1))
     {
       /* Status register cannot be written to as device is in
@@ -1132,9 +1142,9 @@ static int gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
 
   /* Clear the relevant status register bits for the new mask */
 
-  priv->cmdbuf[0] = status[0] & startblock < (priv->nsectors / 2) ?
+  priv->cmdbuf[0] = status[0] & (startblock < (priv->nsectors / 2) ?
                                               ~GD55_SR_BP_LOWER(blkmask) :
-                                              ~GD55_SR_BP_UPPER(blkmask);
+                                              ~GD55_SR_BP_UPPER(blkmask));
 
   if ((priv->cmdbuf[0] & GD55_SR_BP_MASK) == (status[0] & GD55_SR_BP_MASK))
     {
@@ -1142,7 +1152,8 @@ static int gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
     }
 
   gd55_write_status(priv);
-  gd55_read_status(priv, status);
+  status[0] = gd55_read_status1(priv);
+  status[1] = gd55_read_status2(priv);
   if ((status[0] & GD55_SR_BP_MASK) != (priv->cmdbuf[0] & GD55_SR_BP_MASK))
     {
       return -EACCES; /* Likely that the external HW WP# pin is asserted */
