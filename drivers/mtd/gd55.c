@@ -327,7 +327,7 @@ void gd55_unlock(FAR struct qspi_dev_s *qspi)
 }
 
 int gd55_command_read(FAR struct qspi_dev_s *qspi, uint8_t cmd,
-                         FAR void *buffer, size_t buflen)
+                      FAR void *buffer, size_t buflen)
 {
   struct qspi_cmdinfo_s cmdinfo;
 
@@ -377,7 +377,7 @@ static int gd55_command_write(FAR struct qspi_dev_s *qspi, uint8_t cmd,
 }
 
 int gd55_command_address(FAR struct qspi_dev_s *qspi, uint8_t cmd,
-                            off_t addr, uint8_t addrlen)
+                         off_t addr, uint8_t addrlen)
 {
   struct qspi_cmdinfo_s cmdinfo;
 
@@ -430,8 +430,8 @@ int gd55_read_byte(FAR struct gd55_dev_s *dev, FAR uint8_t *buffer,
 }
 
 int gd55_write_page(FAR struct gd55_dev_s *priv,
-                       FAR const uint8_t *buffer,
-                       off_t address, size_t buflen)
+                    FAR const uint8_t *buffer,
+                    off_t address, size_t buflen)
 {
   struct qspi_meminfo_s meminfo;
   uint8_t status[2];
@@ -694,8 +694,7 @@ void gd55_write_status(FAR struct gd55_dev_s *dev)
   while ((status[0] & GD55_SR_WIP) != 0);
 }
 
-int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
-                                          size_t nblocks)
+int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
   size_t blocksleft = nblocks;
@@ -773,7 +772,7 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
 }
 
 ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
-                      size_t nblocks, FAR uint8_t *buf)
+                   size_t nblocks, FAR uint8_t *buf)
 {
   ssize_t nbytes;
 
@@ -785,7 +784,7 @@ ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
 
 #ifdef CONFIG_MTD_GD55_SECTOR512
   nbytes = gd55_read(dev, startblock << GD55_SECTOR512_SHIFT,
-                       nblocks << GD55_SECTOR512_SHIFT, buf);
+                     nblocks << GD55_SECTOR512_SHIFT, buf);
   if (nbytes > 0)
     {
       nbytes >>= GD55_SECTOR512_SHIFT;
@@ -803,7 +802,7 @@ ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
 }
 
 ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
-                       size_t nblocks, FAR const uint8_t *buf)
+                    size_t nblocks, FAR const uint8_t *buf)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
   int ret;
@@ -836,7 +835,7 @@ ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
 }
 
 ssize_t gd55_read(FAR struct mtd_dev_s *dev, off_t offset, size_t nbytes,
-                     FAR uint8_t *buffer)
+                  FAR uint8_t *buffer)
 {
   int ret;
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
