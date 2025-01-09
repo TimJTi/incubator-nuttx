@@ -953,6 +953,22 @@ config MTD_GD55_SECTOR512
 		It is useful if using a file system that demands 512 byte sectors,
 		such as FAT
 
+choice MTD_GD55_PROTECT_MODE
+	prompt "Block protection mode selection"
+	default MTD_GD55_SECTOR_PROTECT
+	---help---
+		Select the required mode to protect blocks from being written to:
+		- SECTOR to protect each 64KiB sector individually
+		- BLOCK to protect sectors either top-down or bottom-up
+		  in (64KiB * n^2) step sizes only
+
+config MTD_GD55_SECTOR_PROTECT
+	bool "By individual sectors"
+
+config MTD_GD55_BLOCK_PROTECT
+	bool "In a (64KiB * n^2) block, top-down or bottom-up"
+
+endchoice #MTD_GD55_PROTECT_MODE
 
 endif # MTD_GD55
 

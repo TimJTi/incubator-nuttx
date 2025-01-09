@@ -67,15 +67,19 @@
 #define GD55_WREN               0x06  /* Write Enable                       */
 #define GD55_WRDI               0x04  /* Write Disable                      */
 #define GD55_RDSR1              0x05  /* Read status register 1             */
-#define GD55_RDSR2              0x35  /* Read status register 2             */
-#define GD55_WRSR1              0x01  /* Write status register 1            */
 #define GD55_EN4B               0xb7  /* Enable 4 byte Addressing Mode      */
 #define GD55_DIS4B              0xe9  /* Disable 4 byte Addressing Mode     */
 #define GD55_IBSL               0x36  /* Individual block/sector lock       */
 #define GD55_IBSUL              0x39  /* Individual block/sector unlock     */
+#define GD55_RIBSL              0x3d  /* Read individual block/sector lock  */
+#define GD55_BLK_PROTECTED      (1 << 0) /* lsb set means block is loced    */
+#define GD55_RDNVCR             0xb5  /* Read Non-Volatile config register  */
+#define GD55_RD_NVCR_DUMMIES    8
 
 /* GD55 Commands NOT used in this driver */
 
+#define GD55_RDSR2              0x35  /* Read status register 2             */
+#define GD55_WRSR1              0x01  /* Write status register 1            */
 #define GD55_SE_ALT             0x21  /* Alternate 4Kb Sector erase         */ GD55_SE_ALT             0x21  /* Alternate 4Kb Sector erase         */
 #define GD55_QC_READ_ALT        0xec  /* Quad output continuous fast read   */
 #define GD55_4B_QDTR_READ       0xed  /* Quad I/O DTR read                  */
@@ -97,8 +101,8 @@
 #define GD55_RDID_ALT           0x9f  /* Read identification (alternate)    */
 #define GD55_PE_SUSPEND         0x75  /* Suspends program/erase             */
 #define GD55_PE_RESUME          0x7a  /* Resume program                     */
-#define GD55_RDNVCR             0xb5  /* Read Non-Volatile config register  */
 #define GD55_RDVCR              0x85  /* Read Volatile config register      */
+#define GD55_RD_VCR_DUMMIES     1
 #define GD55_WRSR2              0x31  /* Write status register 2            */
 #define GD55_WRNVCR             0xb1  /* Write Non-Volatile config register */
 #define GD55_WRENVSC            0x50  /* Write en. Volatile config register */
@@ -111,7 +115,6 @@
 #define GD55_ERSCUR             0x44  /* Erase security register            */
 #define GD55_RSTEN              0x66  /* Reset Enable                       */
 #define GD55_RST                0x99  /* Reset Memory                       */
-#define GD55_RIBSL              0x3d  /* Read individual block/sector lock  */
 #define GD55_GBSL               0x7e  /* Global block/sector lock           */
 #define GD55_GBSUL              0x98  /* Global block/sector unlock         */
 
@@ -129,15 +132,18 @@
 #define GD55_JEDEC_2G_CAPACITY  0x1c /* 2Gbit memory capacity               */
 
 /* GD55 devices all have identical sector sizes:
- * sector size: 4KiB
- * page size:   256B
+ * block protection size: 64KiB
+ * sector size:           4KiB
+ * page size:             256B
  */
 
 #define GD55_SECTOR_SHIFT            (12)
 #define GD55_SECTOR_SIZE             (1 << GD55_SECTOR_SHIFT)        /* 4k  */
 #define GD55_PAGE_SHIFT              (8)                             /* 256 */
 #define GD55_PAGE_SIZE               (1 << GD55_PAGE_SHIFT)
-#define GD55_MIN_PROTECT_BLKS        ((64 * 1024) >> GD55_PAGE_SHIFT)
+#define GD55_PROT_SHIFT              (16)               
+#define GD55_PROT_SIZE               (1 << GD55_PROT_SHIFT)
+#define GD55_PROT_BLOCKS             (GD55_PROT_SIZE / GD55_PAGE_SIZE)
 
 /* GD55B01xx (128 MiB) memory capacity */
 
@@ -158,8 +164,6 @@
 #define GD55_SR_WEL           (1 << 1)  /* Bit 1: Write enable latch        */
 #define GD55_SR_BP_SHIFT      (2)       /* Bits 2-6: Block protect bits     */
 #define GD55_SR_BP_MASK       (31 << GD55_SR_BP_SHIFT)
-#define GD55_SR_BP_UPPER(b)   ( (b + 1)       << GD55_SR_BP_SHIFT)
-#define GD55_SR_BP_LOWER(b)   (((b + 1) + 16) << GD55_SR_BP_SHIFT)
 #define GD55_STATUS_BP_NONE   (0 << GD55_SR_BP_SHIFT)
 #define GD55_STATUS_BP_ALL    (7 << GD55_SR_BP_SHIFT)
 #define GD55_STATUS_TB_MASK   (1 << 5)  /* Bit 6 = BP4: Top/Bottom Protect  */
@@ -177,6 +181,20 @@
 #define GD55_SR_EE            (1 << 5)  /* Bit 5: Erase Error Bit          */
 #define GD55_SR_SRP1          (1 << 6)  /* Bit 6: SR protection bit 1      */
 #define GD55_SR_SUS1          (1 << 7)  /* Bit 7: Program suspend bit 1    */
+
+/* Non-volatile and volatile config register addresses and bits */
+
+#define GD55_DUMMY_CYCLES_REG 1  /* Dummy Cycle Configuration               */
+#define GD55_ODT_DS_REG       3  /* On-die termination and driver
+                                  * strength configuration
+                                  */
+#define GD55_DLP_PROT_REG     4   /* Data Learning and protect mode         */
+#define GD55_PROT_MODE_MASK   (1 << 2) /* Bit 2, BP or WPS mode             */
+#define GD55_PROT_MODE_WPS    (0 << 2) /* 0 = Sector Protect mode                     */
+#define GD55_PROT_MODE_BP     (1 << 2) /* 1 = Block Protect mode (default)  */
+#define GD55_4BYTE_MODE_REG   5   /* 3 pr 4-byte address mode               */
+#define GD55 XIP_MODE_REG     6   /* XIP (continuous read) mode             */
+#define GD55_WRAP_CONFIG_REG  7   /* Wrap mode (none/64byte/32byte/16byte)  */
 
 /* Cache flags **************************************************************/
 
@@ -243,7 +261,7 @@ static int      gd55_command_read(FAR struct qspi_dev_s *qspi, uint8_t cmd,
                                   FAR void *buffer, size_t buflen);
 static int      gd55_command(FAR struct qspi_dev_s *qspi, uint8_t cmd);
 static int      gd55_command_write(FAR struct qspi_dev_s *qspi, uint8_t cmd,
-                                  FAR const void *buffer, size_t buflen);
+                                   FAR const void *buffer, size_t buflen);
 static int      gd55_command_address(FAR struct qspi_dev_s *qspi,
                                      uint8_t cmd, off_t addr,
                                      uint8_t addrlen);
@@ -252,14 +270,15 @@ static int      gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
                              size_t nblocks);
 static int      gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
                                size_t nblocks);
-static bool     gd55_isprotected(FAR struct gd55_dev_s *priv, uint8_t status,
-                                off_t address);
+static bool     gd55_isprotected(FAR struct qspi_dev_s *priv, off_t addr);
 static int      gd55_read_byte(FAR struct gd55_dev_s *dev,
                                FAR uint8_t *buffer, off_t address,
                                size_t buflen);
 static uint8_t  gd55_read_status1(FAR struct gd55_dev_s *dev);
-static uint8_t  gd55_read_status2(FAR struct gd55_dev_s *dev);
-static void     gd55_write_status(FAR struct gd55_dev_s *dev);
+static int      gd55_read_nvconfig(FAR struct qspi_dev_s *qspi, off_t addr,
+                                   FAR uint8_t *nvdata);
+static int      gd55_write_nvconfig(FAR struct gd55_dev_s *priv, off_t addr,
+                                    FAR uint8_t *nvdata);
 static void     gd55_write_enable(FAR struct gd55_dev_s *dev);
 static int      gd55_write_page(FAR struct gd55_dev_s *priv,
                                 FAR const uint8_t *buffer, off_t address,
@@ -513,15 +532,30 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 {
   uint8_t status;
   bool mode_4byte_addr = false;
-  off_t address = sector << GD55_SECTOR_SHIFT;
+  off_t addr = sector << GD55_SECTOR_SHIFT;
 
   finfo("4byte mode: %s\tsector: %08lx\n", mode_4byte_addr ?
                                            "true" : "false",
                                            (unsigned long)sector);
 
+  /* Check that the flash is ready and unprotected */
+
+  status = gd55_read_status1(priv);
+  if ((status & GD55_SR_WIP) == GD55_SR_WIP)
+    {
+      ferr("ERROR: Flash busy: %02x", status);
+      return -EBUSY;
+    }
+
+  if (gd55_isprotected(priv->qspi, addr))
+    {
+      ferr("ERROR: Flash protected at addr: %02x", addr);
+      return -EACCES;
+    }
+
   /* Check if address exceeds range of 3 byte addressing */
 
-  if (address >= MODE_3BYTE_LIMIT)
+  if (addr >= MODE_3BYTE_LIMIT)
     {
       gd55_command(priv->qspi, GD55_EN4B);
       mode_4byte_addr = true;
@@ -530,8 +564,7 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
   /* Send the sector erase command */
 
   gd55_write_enable(priv);
-  gd55_command_address(priv->qspi, GD55_SE, address,
-                                   mode_4byte_addr ? 4 : 3);
+  gd55_command_address(priv->qspi, GD55_SE, addr, mode_4byte_addr ? 4 : 3);
 
   /* Wait for erasure to finish */
 
@@ -553,16 +586,30 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 #ifndef CONFIG_MTD_GD55_SECTOR512
 int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
 {
-  off_t address;
+  off_t addr = sector << GD55_SECTOR_SHIFT;
   uint8_t status;
   bool mode_4byte_addr = false;
 
   finfo("4byte mode: %s\tsector: %08lx\n", mode_4byte_addr ?
                                            "true" : "false",
                                            (unsigned long)sector);
-  address = sector << GD55_SECTOR_SHIFT;
 
-  if (address >= MODE_3BYTE_LIMIT)
+  /* Check that the flash is ready and unprotected */
+
+  status = gd55_read_status1(priv);
+  if ((status & GD55_SR_WIP) == GD55_SR_WIP)
+    {
+      ferr("ERROR: Flash busy: %02x", status);
+      return -EBUSY;
+    }
+
+  if (gd55_isprotected(priv->qspi, addr))
+    {
+      ferr("ERROR: Flash protected at addr: %02x", addr);
+      return -EACCES;
+    }
+
+  if (addr >= MODE_3BYTE_LIMIT)
     {
       gd55_command(priv->qspi, GD55_EN4B);
       mode_4byte_addr = true;
@@ -571,7 +618,7 @@ int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
   /* Send the 64k block erase command */
 
   gd55_write_enable(priv);
-  gd55_command_address(priv->qspi, GD55_BE64, address, mode_4byte_addr ?
+  gd55_command_address(priv->qspi, GD55_BE64, addr, mode_4byte_addr ?
                                                        4 : 3);
 
   /* Wait for erasure to finish */
@@ -593,7 +640,7 @@ int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
 
 int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
 {
-  off_t address;
+  off_t   addr = sector << GD55_SECTOR_SHIFT;;
   uint8_t status;
   bool mode_4byte_addr = false;
 
@@ -601,9 +648,22 @@ int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
                                            "true" : "false",
                                            (unsigned long)sector);
 
-  address = sector <<= GD55_SECTOR_SHIFT;
+  /* Check that the flash is ready and unprotected */
 
-  if (address >= MODE_3BYTE_LIMIT)
+  status = gd55_read_status1(priv);
+  if ((status & GD55_SR_WIP) == GD55_SR_WIP)
+    {
+      ferr("ERROR: Flash busy: %02x", status);
+      return -EBUSY;
+    }
+
+  if (gd55_isprotected(priv->qspi, addr))
+    {
+      ferr("ERROR: Flash protected at addr: %02x", addr);
+      return -EACCES;
+    }
+
+  if (addr >= MODE_3BYTE_LIMIT)
     {
       gd55_command(priv->qspi, GD55_EN4B);
       mode_4byte_addr = true;
@@ -612,8 +672,7 @@ int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
   /* Send the 32k block erase command */
 
   gd55_write_enable(priv);
-  gd55_command_address(priv->qspi, GD55_BE32, address, mode_4byte_addr ?
-                                                       4 : 3);
+  gd55_command_address(priv->qspi, GD55_BE32, addr, mode_4byte_addr ? 4 : 3);
 
   /* Wait for erasure to finish */
 
@@ -675,32 +734,59 @@ static uint8_t gd55_read_status1(FAR struct gd55_dev_s *dev)
   return status;
 }
 
-static uint8_t gd55_read_status2(FAR struct gd55_dev_s *dev)
+static int gd55_read_nvconfig(FAR struct qspi_dev_s *qspi, off_t addr,
+                                  FAR uint8_t *nvdata)
 {
-  uint8_t status;
+  int                   ret;
+  struct qspi_meminfo_s meminfo;
 
-  gd55_command_read(dev->qspi, GD55_RDSR2, &status, 1);
-  return status;
+  meminfo.flags   = QSPIMEM_READ;
+  meminfo.dummies = GD55_RD_NVCR_DUMMIES;
+  meminfo.cmd     = GD55_RDNVCR;
+  meminfo.addr    = addr;
+  meminfo.addrlen = 3;
+  meminfo.buflen  = 1;
+  meminfo.buffer  = nvdata;
+
+  ret = QSPI_MEMORY(qspi, &meminfo);
+  if (ret < 0)
+    {
+      ferr("ERROR: QSPI_MEMORY failed reading address=%06jx\n",
+            (intmax_t)addr);
+    }
+  return ret;
 }
 
-void gd55_write_status(FAR struct gd55_dev_s *dev)
+static int gd55_write_nvconfig(FAR struct gd55_dev_s *priv, off_t addr,
+                               FAR uint8_t *nvdata)
 {
-  uint8_t status;
+  uint8_t               status;
+  int                   ret;
+  struct qspi_meminfo_s meminfo;
 
-  gd55_write_enable(dev);
+  meminfo.flags   = QSPIMEM_WRITE;
+  meminfo.addrlen = 3;
+  meminfo.addr    = addr;
+  meminfo.cmd     = GD55_WRNVCR;
+  meminfo.buflen  = 1;
+  meminfo.buffer  = (FAR void *)nvdata;
+  meminfo.dummies = 0;
 
-  /* take care to mask of the SRP bit; it is one-time-programmable */
+  gd55_write_enable(priv);
+  ret = QSPI_MEMORY(priv->qspi, &meminfo);
 
-  dev->cmdbuf[0] &= ~GD55_SR_SRP0;
-
-  gd55_command_write(dev->qspi, GD55_WRSR1,
-                     (FAR const void *)dev->cmdbuf, 1);
+  if (ret < 0)
+    {
+      ferr("ERROR: QSPI_MEMORY failed writing address=%06jx\n",
+            (intmax_t)addr);
+      return ret;
+    }
 
   /* Wait for write operation to finish */
 
   do
     {
-      status = gd55_read_status1(dev);
+      status = gd55_read_status1(priv);
     }
   while ((status & GD55_SR_WIP) != 0);
 }
@@ -709,9 +795,8 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
   size_t blocksleft = nblocks;
-#ifdef CONFIG_MTD_GD55_SECTOR512
   int ret;
-#else
+#ifndef CONFIG_MTD_GD55_SECTOR512
   const size_t sectorsper64kblock = (64 * 1024) >> GD55_SECTOR_SHIFT;
   const size_t sectorsper32kblock = (32 * 1024) >> GD55_SECTOR_SHIFT;
 #endif
@@ -747,7 +832,11 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
         {
           /* Erase 64k block */
 
-          gd55_erase_64kblock(priv, startblock);
+          ret = gd55_erase_64kblock(priv, startblock);
+          if (ret < 0)
+            {
+              return ret;
+            }
           startblock += sectorsper64kblock;
           blocksleft -= sectorsper64kblock;
           finfo("Erased 64kbytes at address 0x%08" PRIx32 "\n",
@@ -758,7 +847,11 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
         {
           /* Erase 32k block */
 
-          gd55_erase_32kblock(priv, startblock);
+          ret = gd55_erase_32kblock(priv, startblock);
+          if (ret < 0)
+            {
+              return ret;
+            }
           startblock += sectorsper32kblock;
           blocksleft -= sectorsper32kblock;
           finfo("Erased 32kbytes at address 0x%08" PRIx32 "\n",
@@ -768,7 +861,11 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
         {
           /* Erase each sector */
 
-          gd55_erase_sector(priv, startblock);
+          ret = gd55_erase_sector(priv, startblock);
+          if (ret < 0)
+            {
+              return ret;
+            }
           startblock++;
           blocksleft--;
           finfo("Erased 4kbytes at address 0x%08" PRIx32 "\n",
@@ -1038,67 +1135,35 @@ int gd55_readid(FAR struct gd55_dev_s *dev)
 
 /****************************************************************************
  * Name: gd55_protect
+ * 
+ * The GD55 flash supports block-level protection in 64KiB blocks
  ****************************************************************************/
 
 static int gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
                         size_t nblocks)
 {
-  uint8_t status[2];
-  int blkmask;
+  int ret;
+  uint8_t mode;
 
-  /* Check if sector protection registers are locked */
+  /* nblocks must be a multiple of the device protection block size */
 
-  status[0] = gd55_read_status1(priv);
-  status[1] = gd55_read_status2(priv);
-  if ((status[0] & GD55_SR_SRP0) || (status[1] & GD55_SR_SRP1))
+  if (nblocks % GD55_PROT_BLOCKS)
     {
-      /* Status register cannot be written to as device is in
-       * power supply lockdown or is set for OTP.
-       * If the external HW WP# pin is asserted we won't know until we
-       * attempt to lock sectors though.
-       */
-
-      return -EACCES;
+      return -EINVAL;
     }
 
-  /* We can only protect in certain increments of size */
-
-  blkmask = 0;
-  while (nblocks > (GD55_MIN_PROTECT_BLKS << blkmask))
+  ret = gd55_read_nvconfig(priv->qspi, GD55_DLP_PROT_REG, &mode);
+  if (ret < 0)
     {
-      if ((startblock % (GD55_MIN_PROTECT_BLKS << blkmask)) ||
-          (nblocks % (GD55_MIN_PROTECT_BLKS << blkmask)))
-        {
-          return -EINVAL; /* Not a size we can protect */
-        }
-
-      blkmask++;
+      return ret;
     }
 
-  /* Clear the relevant status register bits for the new mask */
+  mode &= ~GD55_PROT_MODE_MASK;
+  mode |= GD55_PROT_MODE_WPS;
+  
+  ret = gd55_write_nvconfig(priv, GD55_DLP_PROT_REG, &mode);
 
-  priv->cmdbuf[0]  = status[0];
-  priv->cmdbuf[0] &= startblock < (priv->nsectors / 2) ?
-                                              ~GD55_SR_BP_LOWER(blkmask) :
-                                              ~GD55_SR_BP_UPPER(blkmask);
-
-  /* Now set them */
-
-  priv->cmdbuf[0] |= startblock < (priv->nsectors / 2) ?
-                                   GD55_SR_BP_LOWER(blkmask) :
-                                   GD55_SR_BP_UPPER(blkmask);
-
-  if ((priv->cmdbuf[0] & GD55_SR_BP_MASK) == (status[0] & GD55_SR_BP_MASK))
-    {
-      return OK; /* this protection is already set */
-    }
-
-  gd55_write_status(priv);
-  status[0] = gd55_read_status1(priv);
-  if ((status[0] & GD55_SR_BP_MASK) != (priv->cmdbuf[0] & GD55_SR_BP_MASK))
-    {
-      return -EACCES; /* Likely that the external HW WP# pin is asserted */
-    }
+  ret = gd55_read_nvconfig(priv->qspi, GD55_DLP_PROT_REG, &mode);
 
   return OK;
 }
@@ -1110,59 +1175,54 @@ static int gd55_protect(FAR struct gd55_dev_s *priv, off_t startblock,
 static int gd55_unprotect(FAR struct gd55_dev_s *priv, off_t startblock,
                           size_t nblocks)
 {
-  uint8_t status[2];
-  int blkmask;
+  /* nblocks must be a multiple of the device protection block size */
 
-  /* Check if sector protection registers are locked */
-
-  status[0] = gd55_read_status1(priv);
-  status[1] = gd55_read_status2(priv);
-  if ((status[0] & GD55_SR_SRP0) || (status[1] & GD55_SR_SRP1))
+  if (nblocks % GD55_PROT_BLOCKS)
     {
-      /* Status register cannot be written to as device is in
-       * power supply lockdown or is set for OTP.
-       * If the external HW WP# pin is asserted we won't know until we
-       * attempt to unlock sectors though.
-       */
-
-      return -EACCES;
+      return -EINVAL;
     }
-
-  /* We can only unprotect in certain increments of size */
-
-  blkmask = 0;
-  while (nblocks > (GD55_MIN_PROTECT_BLKS << blkmask))
-    {
-      if ((startblock % (GD55_MIN_PROTECT_BLKS << blkmask)) ||
-          (nblocks % (GD55_MIN_PROTECT_BLKS << blkmask)))
-        {
-          return -EINVAL; /* Not a size we can protect */
-        }
-
-      blkmask++;
-    }
-
-  /* Clear the relevant status register bits for the new mask */
-
-  priv->cmdbuf[0] = status[0] & (startblock < (priv->nsectors / 2) ?
-                                              ~GD55_SR_BP_LOWER(blkmask) :
-                                              ~GD55_SR_BP_UPPER(blkmask));
-
-  if ((priv->cmdbuf[0] & GD55_SR_BP_MASK) == (status[0] & GD55_SR_BP_MASK))
-    {
-      return OK; /* these sectors already unprotected */
-    }
-
-  gd55_write_status(priv);
-  status[0] = gd55_read_status1(priv);
-  status[1] = gd55_read_status2(priv);
-  if ((status[0] & GD55_SR_BP_MASK) != (priv->cmdbuf[0] & GD55_SR_BP_MASK))
-    {
-      return -EACCES; /* Likely that the external HW WP# pin is asserted */
-    }
-
   return OK;
 }
+
+/****************************************************************************
+ * Name: gd55_isprotected
+ ****************************************************************************/
+
+static bool gd55_isprotected(FAR struct qspi_dev_s *qspi, off_t addr)
+
+{
+  struct qspi_cmdinfo_s cmdinfo;
+  uint8_t isprotected;
+
+  cmdinfo.flags   = QSPICMD_ADDRESS | QSPICMD_READDATA;
+  cmdinfo.cmd     = GD55_RIBSL;
+  cmdinfo.addr    = addr;
+  cmdinfo.buflen  = 1;
+  cmdinfo.buffer  = &isprotected;
+  if (addr >= MODE_3BYTE_LIMIT)
+    {
+      gd55_command(qspi, GD55_EN4B);
+      cmdinfo.addrlen = 4;
+    }
+  else
+    {
+      cmdinfo.addrlen = 3;
+    }
+
+  if (addr >= MODE_3BYTE_LIMIT)
+    {
+      gd55_command(qspi, GD55_DIS4B);
+    }
+
+  QSPI_COMMAND(qspi, &cmdinfo);
+
+  isprotected &= GD55_BLK_PROTECTED;
+
+  finfo("address: 0x%lx is %s\n", addr, isprotected ? "protected" :
+                                                      "not protected");
+
+  return (bool)isprotected;
+}                             
 
 /****************************************************************************
  * Name: gd55_flush_cache
