@@ -887,7 +887,7 @@ static int gd55_erase_chip(FAR struct gd55_dev_s *priv)
       ferr("ERROR: FLASH is Protected: %02x", status);
       return -EACCES;
     }
-  return OK;
+
   /* Erase the whole chip */
 
   gd55_write_enable(priv);
