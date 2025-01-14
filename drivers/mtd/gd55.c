@@ -37,7 +37,6 @@
 
 #include <nuttx/kmalloc.h>
 #include <nuttx/signal.h>
-#include <nuttx/signal.h>
 #include <nuttx/fs/ioctl.h>
 #include <nuttx/spi/qspi.h>
 #include <nuttx/mtd/mtd.h>
@@ -50,9 +49,9 @@
  * address, i.e. 16Mbyte
  */
 
-#define MODE_3BYTE_LIMIT ((16 * 1024 * 1024))
+#define MODE_3BYTE_LIMIT        ((16 * 1024 * 1024))
 
-/* GD55 Commands */
+/* GD55 Commands                                                            */
 
 #define GD55_QREAD              0x6b  /* Quad output fast read              */
 #define GD55_QREAD_DUMMIES      8
@@ -114,7 +113,7 @@
 #define GD55_GBSL               0x7e  /* Global block/sector lock           */
 #define GD55_GBSUL              0x98  /* Global block/sector unlock         */
 
-/* Read ID (RDID) register values */
+/* Read ID (RDID) register values                                           */
 
 #define GD55_MANUFACTURER       0xc8  /* GigaSevice manufacturer ID         */
 
@@ -133,87 +132,87 @@
  * page size:             256B
  */
 
-#define GD55_SECTOR_SHIFT            (12)
-#define GD55_SECTOR_SIZE             (1 << GD55_SECTOR_SHIFT)      /* 4KiB  */
-#define GD55_PAGE_SHIFT              (8)                           /* 256B  */
-#define GD55_PAGE_SIZE               (1 << GD55_PAGE_SHIFT)
-#define GD55_BP_SHIFT                (16)
-#define GD55_BP_SIZE                 (1 << GD55_BP_SHIFT)          /* 64KiB */
-#define GD55_MIN_BP_BLKS             (GD55_BP_SIZE  >> GD55_PAGE_SHIFT)
-#define GD55_SECTORS_PER_BP_BLK      (GD55_BP_SIZE / GD55_SECTOR_SIZE)
+#define GD55_SECTOR_SHIFT       (12)
+#define GD55_SECTOR_SIZE        (1 << GD55_SECTOR_SHIFT)           /* 4KiB  */
+#define GD55_PAGE_SHIFT         (8)                                /* 256B  */
+#define GD55_PAGE_SIZE          (1 << GD55_PAGE_SHIFT)
+#define GD55_BP_SHIFT           (16)
+#define GD55_BP_SIZE            (1 << GD55_BP_SHIFT)               /* 64KiB */
+#define GD55_MIN_BP_BLKS        (GD55_BP_SIZE  >> GD55_PAGE_SHIFT)
+#define GD55_SECTORS_PER_BP_BLK (GD55_BP_SIZE / GD55_SECTOR_SIZE)
 
-/* GD55B01xx (128 MiB) memory capacity */
+/* GD55B01xx (128 MiB) memory capacity                                      */
 
-#define GD55_NSECTORS_1GBIT      (32768)
+#define GD55_NSECTORS_1GBIT     (32768)
 
-/* GD55B02xx (256 MiB) memory capacity */
+/* GD55B02xx (256 MiB) memory capacity                                      */
 
-#define GD55_NSECTORS_2GBIT      (65536)
+#define GD55_NSECTORS_2GBIT     (65536)
 
 /* 512 byte sector support **************************************************/
 
-#define GD55_SECTOR512_SHIFT     (9)
-#define GD55_SECTOR512_SIZE      (1 << GD55_SECTOR512_SHIFT)
+#define GD55_SECTOR512_SHIFT    (9)
+#define GD55_SECTOR512_SIZE     (1 << GD55_SECTOR512_SHIFT)
 
-/* Status register 1 bit definitions */
+/* Status register 1 bit definitions                                        */
 
-#define GD55_SR_WIP           (1 << 0)  /* Bit 0: Write in progress         */
-#define GD55_SR_WEL           (1 << 1)  /* Bit 1: Write enable latch        */
-#define GD55_SR_BP_SHIFT      (2)       /* Bits 2-6: Block protect bits     */
-#define GD55_SR_BP_MASK       (31 << GD55_SR_BP_SHIFT)
-#define GD55_STATUS_BP_NONE   (0 << GD55_SR_BP_SHIFT)
-#define GD55_STATUS_BP_ALL    (7 << GD55_SR_BP_SHIFT)
-#define GD55_STATUS_TB_MASK   (1 << 6)  /* BP4 Top/Bottom Protect  */
-#define GD55_STATUS_TB_TOP    (0 << 6)  /*   = 0, BP3-BP0 protect Top down  */
-#define GD55_STATUS_TB_BOTTOM (1 << 6)  /*   = 1, BP3-BP0 protect Bottom up */
-#define GD55_SR_BP_TOP(b)     (((b + 1) << GD55_SR_BP_SHIFT) | \
-                               GD55_STATUS_TB_TOP)
-#define GD55_SR_BP_BOTTOM(b)  (((b + 1) << GD55_SR_BP_SHIFT) | \
-                               GD55_STATUS_TB_BOTTOM)
-#define GD55_BP_ALL           (14 << GD55_SR_BP_SHIFT)
-                                        /* GD55B01 needs BP bits = 0xx11xx
-                                         * GD55B02 needs BP bits = 0xx111x
-                                         */
-#define GD55_SR_SRP0          (1 << 7)  /* Bit 7: SR protect bit 0          */
+#define GD55_SR_WIP             (1 << 0)  /* Bit 0: Write in progress       */
+#define GD55_SR_WEL             (1 << 1)  /* Bit 1: Write enable latch      */
+#define GD55_SR_BP_SHIFT        (2)       /* Bits 2-6: Block protect bits   */
+#define GD55_SR_BP_MASK         (31 << GD55_SR_BP_SHIFT)
+#define GD55_STATUS_BP_NONE     (0 << GD55_SR_BP_SHIFT)
+#define GD55_STATUS_BP_ALL      (7 << GD55_SR_BP_SHIFT)
+#define GD55_STATUS_TB_MASK     (1 << 6)  /* BP4 Top/Bottom Protect         */
+#define GD55_STATUS_TB_TOP      (0 << 6)  /*   = 0, BP3..0 protect Top down */
+#define GD55_STATUS_TB_BOTTOM   (1 << 6)  /*   = 1, BP3..0   "   Bottom up  */
+#define GD55_SR_BP_TOP(b)       (((b + 1) << GD55_SR_BP_SHIFT) | \
+                                 GD55_STATUS_TB_TOP)
+#define GD55_SR_BP_BOTTOM(b)    (((b + 1) << GD55_SR_BP_SHIFT) | \
+                                 GD55_STATUS_TB_BOTTOM)
+#define GD55_BP_ALL             (14 << GD55_SR_BP_SHIFT)
+                                          /* GD55B01 needs BP bits = 0xx11xx
+                                           * GD55B02 needs BP bits = 0xx111x
+                                           */
+#define GD55_SR_SRP0            (1 << 7)  /* Bit 7: SR protect bit 0        */
 
-/* Status register 2 bit definitions */
+/* Status register 2 bit definitions                                        */
 
-#define GD55_SR_ADS           (1 << 0)  /* Bit 0: Current Address Mode      */
-                                        /* Bit 1 - reserved                 */
-#define GD55_SR_SUS2          (1 << 2)  /* Bit 2: Program suspend bit 2     */
-#define GD55_SR_LB            (1 << 3)  /* Bit 3: Security Register Lock    */
-#define GD55_SR_PE            (1 << 4)  /* Bit 4: Program Error Bit         */
-#define GD55_SR_EE            (1 << 5)  /* Bit 5: Erase Error Bit           */
-#define GD55_SR_SRP1          (1 << 6)  /* Bit 6: SR protection bit 1       */
-#define GD55_SR_SUS1          (1 << 7)  /* Bit 7: Program suspend bit 1     */
+#define GD55_SR_ADS             (1 << 0)  /* Bit 0: Current Address Mode    */
+                                          /* Bit 1 - reserved               */
+#define GD55_SR_SUS2            (1 << 2)  /* Bit 2: Program suspend bit 2   */
+#define GD55_SR_LB              (1 << 3)  /* Bit 3: Security Register Lock  */
+#define GD55_SR_PE              (1 << 4)  /* Bit 4: Program Error Bit       */
+#define GD55_SR_EE              (1 << 5)  /* Bit 5: Erase Error Bit         */
+#define GD55_SR_SRP1            (1 << 6)  /* Bit 6: SR protection bit 1     */
+#define GD55_SR_SUS1            (1 << 7)  /* Bit 7: Program suspend bit 1   */
 
-/* Non-volatile and volatile config register addresses and bits */
+/* Non-volatile and volatile config register addresses and bits             */
 
-#define GD55_DUMMY_CYCLES_REG 1         /* Dummy Cycle Configuration        */
-#define GD55_ODT_DS_REG       3         /* On-die termination and driver
-                                         * strength configuration
-                                         */
-#define GD55_DLP_PROT_REG     4         /* Data Learning and protect mode   */
-#define GD55_PROT_MODE_MASK   (1 << 2)  /* Bit 2, BP or WPS mode            */
-#define GD55_PROT_MODE_WPS    (0 << 2)  /* 0 = Sector Protect mode          */
-#define GD55_PROT_MODE_BP     (1 << 2)  /* 1 = Block Protect mode (default) */
-#define GD55_4BYTE_MODE_REG   5         /* 3 pr 4-byte address mode         */
-#define GD55 XIP_MODE_REG     6         /* XIP (continuous read) mode       */
-#define GD55_WRAP_CONFIG_REG  7         /* Wrap mode (none/64/32/16 byte)   */
+#define GD55_DUMMY_CYCLES_REG   1         /* Dummy Cycle Configuration      */
+#define GD55_ODT_DS_REG         3         /* On-die termination and driver
+                                           * strength configuration
+                                           */
+#define GD55_DLP_PROT_REG       4         /* Data Learning and protect mode */
+#define GD55_PROT_MODE_MASK     (1 << 2)  /* Bit 2, BP or WPS mode          */
+#define GD55_PROT_MODE_WPS      (0 << 2)  /* 0 = Sector Protect mode        */
+#define GD55_PROT_MODE_BP       (1 << 2)  /* 1 = Block Protect mode (def.)  */
+#define GD55_4BYTE_MODE_REG     5         /* 3 pr 4-byte address mode       */
+#define GD55 XIP_MODE_REG       6         /* XIP (continuous read) mode     */
+#define GD55_WRAP_CONFIG_REG    7         /* Wrap mode (none/64/32/16 byte) */
 
 /* Block protection bit */
 
-#define GD55_BLK_PROTECTED    (1 << 0)  /* lsb set means block is locked    */
+#define GD55_BLK_PROTECTED      (1 << 0)  /* lsb set means block is locked  */
 
 /* Cache flags **************************************************************/
 
-#define GD55_CACHE_VALID  (1 << 0)  /* 1=Cache has valid data               */
-#define GD55_CACHE_DIRTY  (1 << 1)  /* 1=Cache is dirty                     */
-#define GD55_CACHE_ERASED (1 << 2)  /* 1=Backing FLASH is erased            */
+#define GD55_CACHE_VALID        (1 << 0)  /* 1=Cache has valid data         */
+#define GD55_CACHE_DIRTY        (1 << 1)  /* 1=Cache is dirty               */
+#define GD55_CACHE_ERASED       (1 << 2)  /* 1=Backing FLASH is erased      */
 
-#define IS_VALID(p)   ((((p)->flags) & GD55_CACHE_VALID) != 0)
-#define IS_DIRTY(p)   ((((p)->flags) & GD55_CACHE_DIRTY) != 0)
-#define IS_ERASED(p)  ((((p)->flags) & GD55_CACHE_ERASED) != 0)
+#define IS_VALID(p)             ((((p)->flags) & GD55_CACHE_VALID) != 0)
+#define IS_DIRTY(p)             ((((p)->flags) & GD55_CACHE_DIRTY) != 0)
+#define IS_ERASED(p)            ((((p)->flags) & GD55_CACHE_ERASED) != 0)
 
 #define SET_VALID(p)  do { (p)->flags |= GD55_CACHE_VALID; } while (0)
 #define SET_DIRTY(p)  do { (p)->flags |= GD55_CACHE_DIRTY; } while (0)
@@ -223,7 +222,7 @@
 #define CLR_DIRTY(p)  do { (p)->flags &= ~GD55_CACHE_DIRTY; } while (0)
 #define CLR_ERASED(p) do { (p)->flags &= ~GD55_CACHE_ERASED; } while (0)
 
-#define GD55_ERASED_STATE 0xff
+#define GD55_ERASED_STATE       0xff
 
 /****************************************************************************
  * Private Types
@@ -236,7 +235,7 @@ struct gd55_dev_s
   struct mtd_dev_s       mtd;         /* MTD interface                      */
   FAR struct qspi_dev_s *qspi;        /* QuadSPI interface                  */
   FAR uint8_t           *cmdbuf;      /* Allocated command buffer           */
-  FAR uint8_t           *readbuf;     /* Allocated status read buffer */
+  FAR uint8_t           *readbuf;     /* Allocated status read buffer       */
   uint32_t               nsectors;    /* Number of erase sectors            */
 #ifdef CONFIG_MTD_GD55_SECTOR512
   uint8_t                flags;       /* Buffered sector flags              */
@@ -334,7 +333,7 @@ static int          gd55_erase_32kblock(FAR struct gd55_dev_s *priv,
  *
  ****************************************************************************/
 
-void gd55_lock(FAR struct gd55_dev_s *priv)
+static void gd55_lock(FAR struct gd55_dev_s *priv)
 {
   QSPI_LOCK(priv->qspi, true);
 
@@ -366,7 +365,7 @@ void gd55_lock(FAR struct gd55_dev_s *priv)
  *
  ****************************************************************************/
 
-void gd55_unlock(FAR struct gd55_dev_s *priv)
+static void gd55_unlock(FAR struct gd55_dev_s *priv)
 {
   QSPI_LOCK(priv->qspi, false);
 }
@@ -388,7 +387,7 @@ void gd55_unlock(FAR struct gd55_dev_s *priv)
  *
  ****************************************************************************/
 
-int gd55_command_read(FAR struct gd55_dev_s *priv, uint8_t cmd,
+static int gd55_command_read(FAR struct gd55_dev_s *priv, uint8_t cmd,
                       FAR void *buffer, size_t buflen)
 {
   struct qspi_cmdinfo_s cmdinfo;
@@ -420,7 +419,7 @@ int gd55_command_read(FAR struct gd55_dev_s *priv, uint8_t cmd,
  *
  ****************************************************************************/
 
-int gd55_command(FAR struct gd55_dev_s *priv, uint8_t cmd)
+static int gd55_command(FAR struct gd55_dev_s *priv, uint8_t cmd)
 {
   struct qspi_cmdinfo_s cmdinfo;
 
@@ -487,7 +486,7 @@ static int gd55_command_write(FAR struct gd55_dev_s *priv, uint8_t cmd,
  *
  ****************************************************************************/
 
-int gd55_command_address(FAR struct gd55_dev_s *priv, uint8_t cmd,
+static int gd55_command_address(FAR struct gd55_dev_s *priv, uint8_t cmd,
                          off_t addr, uint8_t addrlen)
 {
   struct qspi_cmdinfo_s cmdinfo;
@@ -522,7 +521,7 @@ int gd55_command_address(FAR struct gd55_dev_s *priv, uint8_t cmd,
  *
  ****************************************************************************/
 
-int gd55_read_bytes(FAR struct gd55_dev_s *priv, FAR uint8_t *buffer,
+static int gd55_read_bytes(FAR struct gd55_dev_s *priv, FAR uint8_t *buffer,
                     off_t address, size_t buflen)
 {
   bool                  mode_4byte_addr;
@@ -574,7 +573,7 @@ int gd55_read_bytes(FAR struct gd55_dev_s *priv, FAR uint8_t *buffer,
  *
  ****************************************************************************/
 
-int gd55_write_page(FAR struct gd55_dev_s *priv,
+static int gd55_write_page(FAR struct gd55_dev_s *priv,
                     FAR const uint8_t *buffer,
                     off_t address, size_t buflen)
 {
@@ -668,7 +667,7 @@ int gd55_write_page(FAR struct gd55_dev_s *priv,
  *
  ****************************************************************************/
 
-int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
+static int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
 {
   uint8_t status;
   bool    mode_4byte_addr = false;
@@ -739,7 +738,7 @@ int gd55_erase_sector(FAR struct gd55_dev_s *priv, off_t sector)
  *
  ****************************************************************************/
 
-int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
+static int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
 {
   off_t   addr = sector << GD55_SECTOR_SHIFT;
   uint8_t status;
@@ -808,7 +807,7 @@ int gd55_erase_64kblock(FAR struct gd55_dev_s *priv, off_t sector)
  *
  ****************************************************************************/
 
-int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
+static int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
 {
   off_t   addr = sector << GD55_SECTOR_SHIFT;
   uint8_t status;
@@ -876,7 +875,7 @@ int gd55_erase_32kblock(FAR struct gd55_dev_s *priv, off_t sector)
  *
  ****************************************************************************/
 
-int gd55_erase_chip(FAR struct gd55_dev_s *priv)
+static int gd55_erase_chip(FAR struct gd55_dev_s *priv)
 {
   uint8_t status;
 
@@ -912,7 +911,7 @@ int gd55_erase_chip(FAR struct gd55_dev_s *priv)
  *
  ****************************************************************************/
 
-void gd55_write_enable(FAR struct gd55_dev_s *priv)
+static void gd55_write_enable(FAR struct gd55_dev_s *priv)
 {
   uint8_t status;
 
@@ -984,7 +983,7 @@ static uint8_t gd55_read_status2(FAR struct gd55_dev_s *priv)
  *
  ****************************************************************************/
 
-void gd55_write_status1(FAR struct gd55_dev_s *priv)
+static void gd55_write_status1(FAR struct gd55_dev_s *priv)
 {
   uint8_t status;
 
@@ -1022,7 +1021,8 @@ void gd55_write_status1(FAR struct gd55_dev_s *priv)
  *
  ****************************************************************************/
 
-int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
+static int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock,
+                      size_t nblocks)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
   size_t                blocksleft = nblocks;
@@ -1131,7 +1131,7 @@ int gd55_erase(FAR struct mtd_dev_s *dev, off_t startblock, size_t nblocks)
  *
  ****************************************************************************/
 
-ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
+static ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
                    size_t nblocks, FAR uint8_t *buf)
 {
   ssize_t nbytes;
@@ -1178,7 +1178,7 @@ ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
  *
  ****************************************************************************/
 
-ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
+static ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
                     size_t nblocks, FAR const uint8_t *buf)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
@@ -1196,7 +1196,6 @@ ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
     {
       ferr("ERROR: gd55_write_cache failed: %d\n", ret);
     }
-
 #else
   ret = gd55_write_page(priv, buf, startblock << GD55_PAGE_SHIFT,
                           nblocks << GD55_PAGE_SHIFT);
@@ -1228,8 +1227,8 @@ ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
  *
  ****************************************************************************/
 
-ssize_t gd55_read(FAR struct mtd_dev_s *dev, off_t offset, size_t nbytes,
-                  FAR uint8_t *buffer)
+static ssize_t gd55_read(FAR struct mtd_dev_s *dev, off_t offset,
+                         size_t nbytes, FAR uint8_t *buffer)
 {
   int                   ret;
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
@@ -1267,7 +1266,7 @@ ssize_t gd55_read(FAR struct mtd_dev_s *dev, off_t offset, size_t nbytes,
  *   Success (OK) or fail (negated error code)
  ****************************************************************************/
 
-int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
+static int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
   int                    ret  = -EINVAL;
@@ -1401,7 +1400,7 @@ int gd55_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
  *
  ****************************************************************************/
 
-int gd55_readid(FAR struct gd55_dev_s *priv)
+static int gd55_readid(FAR struct gd55_dev_s *priv)
 {
   /* Lock the QuadSPI bus and configure the bus. */
 
@@ -1958,7 +1957,7 @@ static int gd55_write_cache(FAR struct gd55_dev_s *priv,
  ****************************************************************************/
 
 FAR struct mtd_dev_s *gd55_initialize(FAR struct qspi_dev_s *qspi,
-                                         bool unprotect)
+                                      bool unprotect)
 {
   FAR struct gd55_dev_s *dev;
   int ret;
