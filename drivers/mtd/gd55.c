@@ -188,7 +188,6 @@
 
 /* Non-volatile and volatile config register addresses and bits             */
 
-#define GD55_NUM_NV_REGISTERS   6
 #define GD55_DUMMY_CYCLES_REG   1         /* Dummy Cycle Configuration      */
 #define GD55_ODT_DS_REG         3         /* On-die termination and driver
                                            * strength configuration
