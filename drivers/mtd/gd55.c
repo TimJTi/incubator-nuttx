@@ -210,16 +210,16 @@
 #define GD55_CACHE_DIRTY        (1 << 1)  /* 1=Cache is dirty               */
 #define GD55_CACHE_ERASED       (1 << 2)  /* 1=Backing FLASH is erased      */
 
-#define IS_VALID(p)             ((((p)->flags) & GD55_CACHE_VALID) != 0)
-#define IS_DIRTY(p)             ((((p)->flags) & GD55_CACHE_DIRTY) != 0)
+#define IS_VALID(p)             ((((p)->flags) & GD55_CACHE_VALID)  != 0)
+#define IS_DIRTY(p)             ((((p)->flags) & GD55_CACHE_DIRTY)  != 0)
 #define IS_ERASED(p)            ((((p)->flags) & GD55_CACHE_ERASED) != 0)
 
-#define SET_VALID(p)  do { (p)->flags |= GD55_CACHE_VALID; } while (0)
-#define SET_DIRTY(p)  do { (p)->flags |= GD55_CACHE_DIRTY; } while (0)
-#define SET_ERASED(p) do { (p)->flags |= GD55_CACHE_ERASED; } while (0)
+#define SET_VALID(p)  do { (p)->flags |= GD55_CACHE_VALID;   } while (0)
+#define SET_DIRTY(p)  do { (p)->flags |= GD55_CACHE_DIRTY;   } while (0)
+#define SET_ERASED(p) do { (p)->flags |= GD55_CACHE_ERASED;  } while (0)
 
-#define CLR_VALID(p)  do { (p)->flags &= ~GD55_CACHE_VALID; } while (0)
-#define CLR_DIRTY(p)  do { (p)->flags &= ~GD55_CACHE_DIRTY; } while (0)
+#define CLR_VALID(p)  do { (p)->flags &= ~GD55_CACHE_VALID;  } while (0)
+#define CLR_DIRTY(p)  do { (p)->flags &= ~GD55_CACHE_DIRTY;  } while (0)
 #define CLR_ERASED(p) do { (p)->flags &= ~GD55_CACHE_ERASED; } while (0)
 
 #define GD55_ERASED_STATE       0xff
@@ -388,7 +388,7 @@ static void gd55_unlock(FAR struct gd55_dev_s *priv)
  ****************************************************************************/
 
 static int gd55_command_read(FAR struct gd55_dev_s *priv, uint8_t cmd,
-                      FAR void *buffer, size_t buflen)
+                             FAR void *buffer, size_t buflen)
 {
   struct qspi_cmdinfo_s cmdinfo;
 
@@ -487,7 +487,7 @@ static int gd55_command_write(FAR struct gd55_dev_s *priv, uint8_t cmd,
  ****************************************************************************/
 
 static int gd55_command_address(FAR struct gd55_dev_s *priv, uint8_t cmd,
-                         off_t addr, uint8_t addrlen)
+                                off_t addr, uint8_t addrlen)
 {
   struct qspi_cmdinfo_s cmdinfo;
 
@@ -522,7 +522,7 @@ static int gd55_command_address(FAR struct gd55_dev_s *priv, uint8_t cmd,
  ****************************************************************************/
 
 static int gd55_read_bytes(FAR struct gd55_dev_s *priv, FAR uint8_t *buffer,
-                    off_t address, size_t buflen)
+                           off_t address, size_t buflen)
 {
   bool                  mode_4byte_addr;
   int                   ret;
@@ -574,8 +574,8 @@ static int gd55_read_bytes(FAR struct gd55_dev_s *priv, FAR uint8_t *buffer,
  ****************************************************************************/
 
 static int gd55_write_page(FAR struct gd55_dev_s *priv,
-                    FAR const uint8_t *buffer,
-                    off_t address, size_t buflen)
+                           FAR const uint8_t *buffer,
+                           off_t address, size_t buflen)
 {
   struct qspi_meminfo_s meminfo;
   uint8_t               status;
@@ -627,7 +627,7 @@ static int gd55_write_page(FAR struct gd55_dev_s *priv,
         {
           ferr("ERROR: QSPI_MEMORY failed writing address=%06jx\n",
                (intmax_t)address);
-          return ret;
+          goto exit;
         }
 
       /* Update for the next time through the loop */
@@ -644,12 +644,13 @@ static int gd55_write_page(FAR struct gd55_dev_s *priv,
       while ((status & GD55_SR_WIP) != 0);
     }
 
+exit:
   if (meminfo.addrlen == 4)
     {
       gd55_command(priv, GD55_DIS4B);
     }
 
-  return OK;
+  return ret;
 }
 
 /****************************************************************************
@@ -1143,7 +1144,7 @@ unlock:
  ****************************************************************************/
 
 static ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
-                   size_t nblocks, FAR uint8_t *buf)
+                          size_t nblocks, FAR uint8_t *buf)
 {
   ssize_t nbytes;
 
@@ -1190,7 +1191,7 @@ static ssize_t gd55_bread(FAR struct mtd_dev_s *dev, off_t startblock,
  ****************************************************************************/
 
 static ssize_t gd55_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
-                    size_t nblocks, FAR const uint8_t *buf)
+                           size_t nblocks, FAR const uint8_t *buf)
 {
   FAR struct gd55_dev_s *priv = (FAR struct gd55_dev_s *)dev;
   int                   ret;
@@ -1761,7 +1762,7 @@ static int gd55_flush_cache(FAR struct gd55_dev_s *priv)
  ****************************************************************************/
 
 static FAR uint8_t *gd55_read_cache(FAR struct gd55_dev_s *priv,
-                                       off_t sector)
+                                    off_t sector)
 {
   off_t esectno;
   int   shift;
@@ -1889,8 +1890,8 @@ static void gd55_erase_cache(FAR struct gd55_dev_s *priv, off_t sector)
  ****************************************************************************/
 
 static int gd55_write_cache(FAR struct gd55_dev_s *priv,
-                               FAR const uint8_t *buffer, off_t sector,
-                               size_t nsectors)
+                            FAR const uint8_t *buffer, off_t sector,
+                            size_t nsectors)
 {
   FAR uint8_t *dest;
   int         ret;
